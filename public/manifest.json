@@ -1,0 +1,9 @@
+{
+  "name": "Shalom Employee Scheduling App",
+  "short_name": "Shalom App",
+  "description": "An employee scheduling system",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1a1a1a"
+}

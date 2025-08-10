@@ -2,6 +2,16 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
+### Environment variables
+
+Create a `.env.local` file in the project root with your database connection string:
+
+```
+DATABASE_URL=postgres://USER:PASSWORD@HOST:PORT/DBNAME
+```
+
+Note: `DATABASE_URL` is required for API routes that connect to PostgreSQL.
+
 First, run the development server:
 
 ```bash
