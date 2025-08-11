@@ -8,13 +8,11 @@ import interactionPlugin from "@fullcalendar/interaction";
 import Link from "next/link";
 
 export default function DashboardPage() {
-  // Live numbers from API
   const [totalEmployees, setTotalEmployees] = useState<number>(0);
   const [totalShiftsThisWeek, setTotalShiftsThisWeek] = useState<number>(0);
   const [fillRatePct, setFillRatePct] = useState<number>(0);
   const [unavailCount, setUnavailCount] = useState<number>(0);
 
-  // Calendar data
   type ApiSchedule = {
     id: number;
     employee_name: string;
@@ -30,30 +28,18 @@ export default function DashboardPage() {
   const [loadingEvents, setLoadingEvents] = useState<boolean>(true);
   const [eventsError, setEventsError] = useState<string | null>(null);
 
-  // Load stats
+  // Load stats from unified API
   useEffect(() => {
     async function loadStats() {
       try {
-        const [empRes, shiftsRes, unavailRes] = await Promise.all([
-          fetch("/api/employees/count"),
-          fetch("/api/shifts/countThisWeek"),
-          fetch("/api/unavailabilities/count"),
-        ]);
+        const res = await fetch("/api/dashboard");
+        if (!res.ok) throw new Error("Failed to load dashboard stats");
+        const data = await res.json();
 
-        if (empRes.ok) {
-          const { count } = await empRes.json();
-          setTotalEmployees(count);
-        }
-        if (shiftsRes.ok) {
-          const { count } = await shiftsRes.json();
-          setTotalShiftsThisWeek(count);
-          // Fake fill rate for now — ideally your API should send this
-          setFillRatePct(Math.min(100, Math.round((count / (count + 5)) * 100)));
-        }
-        if (unavailRes.ok) {
-          const { count } = await unavailRes.json();
-          setUnavailCount(count);
-        }
+        setTotalEmployees(data.totalEmployees || 0);
+        setTotalShiftsThisWeek(data.totalShiftsThisWeek || 0);
+        setFillRatePct(data.fillRatePct || 0);
+        setUnavailCount(data.unavailCount || 0);
       } catch (err) {
         console.error("Error loading stats:", err);
       }

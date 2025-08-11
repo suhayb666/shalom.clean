@@ -1,0 +1,45 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model employees {
+  id            Int      @id @default(autoincrement())
+  name          String
+  gender        String
+  date_of_birth DateTime @db.Date
+  email         String?  @db.VarChar(255)
+  phone         String?  @db.VarChar(50)
+  position      String?
+}
+
+model schedules {
+  id            Int      @id @default(autoincrement())
+  employee_name String
+  store_name    String
+  shift_name    String
+  start_time    DateTime @db.Time(6)
+  end_time      DateTime @db.Time(6)
+  schedule_date DateTime @db.Date
+}
+
+model shifts {
+  id         Int      @id @default(autoincrement())
+  shift_name String
+  start_time DateTime @db.Time(6)
+  end_time   DateTime @db.Time(6)
+  remarks    String?
+}
+
+model unavailabilities {
+  id            Int      @id @default(autoincrement())
+  employee_name String
+  start_date    DateTime @db.Date
+  end_date      DateTime @db.Date
+  remarks       String?
+}

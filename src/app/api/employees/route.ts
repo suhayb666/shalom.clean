@@ -1,7 +1,5 @@
-// src/app/api/employees/route.ts
 import { NextResponse } from "next/server";
 import { Client } from "pg";
-
 
 export async function GET() {
   const client = new Client({
@@ -13,24 +11,9 @@ export async function GET() {
 
   try {
     await client.connect();
-    try {
-      const res = await client.query(
-        "SELECT id, name, gender, date_of_birth, position, email, phone FROM employees ORDER BY id ASC"
-      );
-      return NextResponse.json(res.rows);
-    } catch (err) {
-      // If columns do not exist yet, attempt to add them and retry once
-      const error = err as unknown as { code?: string; message?: string };
-      if (error.code === "42703") {
-        await client.query("ALTER TABLE employees ADD COLUMN IF NOT EXISTS email VARCHAR(255)");
-        await client.query("ALTER TABLE employees ADD COLUMN IF NOT EXISTS phone VARCHAR(50)");
-        const res = await client.query(
-          "SELECT id, name, gender, date_of_birth, position, email, phone FROM employees ORDER BY id ASC"
-        );
-        return NextResponse.json(res.rows);
-      }
-      throw err;
-    }
+    // Get all employee records
+    const res = await client.query("SELECT * FROM employees");
+    return NextResponse.json(res.rows); // Return array!
   } catch (err) {
     const error = err as Error;
     console.error(error);
@@ -39,4 +22,3 @@ export async function GET() {
     await client.end();
   }
 }
-
