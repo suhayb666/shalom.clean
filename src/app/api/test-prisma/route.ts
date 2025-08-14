@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma"; // ✅ changed to named import
 
 export async function GET() {
   try {
     const totalEmployees = await prisma.employees.count();
     return NextResponse.json({ totalEmployees });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Test Prisma Error:", error);
-    return NextResponse.json({ error: error.message || String(error) }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

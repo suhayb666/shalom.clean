@@ -31,8 +31,9 @@ export async function GET() {
       fillRatePct,
       unavailCount,
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Dashboard API Error:', error);
-    return NextResponse.json({ error: error.message || String(error) }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
