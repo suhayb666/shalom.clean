@@ -82,7 +82,7 @@ export default function ShiftsPage() {
 
       <div className="bg-white rounded-xl shadow-lg overflow-hidden">
         {loading ? (
-          <div className="p-6 text-center">Loading shifts...</div>
+          <div className="p-6 text-center text-[#009999] text-lg font-semibold animate-pulse">Loading Please Wait...</div>
         ) : error ? (
           <div className="p-6 text-center text-red-600">Error: {error}</div>
         ) : (
@@ -101,7 +101,8 @@ export default function ShiftsPage() {
               {filtered.map((shift, index) => (
                 <tr
                   key={shift.id}
-                  className="hover:bg-gray-50 transition-colors"
+                  className="hover:bg-[#bfe6cd] transition-colors"
+
                 >
                   <td className="py-3 px-4 text-black">{index + 1}</td>
                   <td className="py-3 px-4 font-medium text-black">{shift.shift_name}</td>

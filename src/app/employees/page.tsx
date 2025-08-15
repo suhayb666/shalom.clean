@@ -102,7 +102,7 @@ export default function EmployeesPage() {
 
       <div className="bg-white rounded-xl shadow-lg overflow-hidden">
         {loading ? (
-          <div className="p-6 text-center">Loading employees...</div>
+          <div className="p-6 text-center text-[#009999] text-lg font-semibold animate-pulse">Loading Please Wait...</div>
         ) : error ? (
           <div className="p-6 text-center text-red-600">Error: {error}</div>
         ) : (

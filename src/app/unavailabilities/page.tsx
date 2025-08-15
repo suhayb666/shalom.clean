@@ -98,12 +98,12 @@ export default function UnavailabilitiesPage() {
 
       <div className="bg-white rounded-xl shadow-lg overflow-hidden">
         {loading ? (
-          <div className="p-6 text-center">Loading unavailabilities...</div>
+          <div className="p-6 text-center text-[#f43f5e] text-lg font-semibold animate-pulse">Loading Please Wait...</div>
         ) : error ? (
           <div className="p-6 text-center text-red-600">Error: {error}</div>
         ) : (
           <table className="w-full">
-            <thead className="bg-[#009999] text-white">
+            <thead className="bg-[#f43f5e] text-white">
               <tr>
                 <th className="text-left py-3 px-4">Sr. No.</th>
                 <th className="text-left py-3 px-4">Employee Name</th>
@@ -118,7 +118,7 @@ export default function UnavailabilitiesPage() {
               {filtered.map((unavailability, index) => (
                 <tr
                   key={unavailability.id}
-                  className="hover:bg-gray-50 transition-colors"
+                  className="hover:bg-[#fecdd3] transition-colors"
                 >
                   <td className="py-3 px-4 text-black">{index + 1}</td>
                   <td className="py-3 px-4 font-medium text-black">{unavailability.employee_name}</td>
