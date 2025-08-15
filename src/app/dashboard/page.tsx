@@ -23,12 +23,20 @@ export default function DashboardPage() {
     schedule_date: string;
   };
 
+  type ApiUnavailability = {
+    id: number;
+    employee_name: string;
+    start_date: string;
+    end_date: string;
+    remarks?: string;
+  };
+
   const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
   const [initialDate, setInitialDate] = useState<string | undefined>(undefined);
   const [loadingEvents, setLoadingEvents] = useState<boolean>(true);
   const [eventsError, setEventsError] = useState<string | null>(null);
 
-  // Load stats from unified API
+  // Load stats
   useEffect(() => {
     async function loadStats() {
       try {
@@ -47,14 +55,22 @@ export default function DashboardPage() {
     loadStats();
   }, []);
 
-  // Load schedules
+  // Load schedules + unavailabilities
   useEffect(() => {
-    async function loadSchedules() {
+    async function loadEvents() {
       try {
         setLoadingEvents(true);
-        const res = await fetch("/api/schedules");
-        if (!res.ok) throw new Error("Failed to load schedules");
-        const data: ApiSchedule[] = await res.json();
+
+        const [schedRes, unavailRes] = await Promise.all([
+          fetch("/api/schedules"),
+          fetch("/api/unavailabilities"),
+        ]);
+
+        if (!schedRes.ok) throw new Error("Failed to load schedules");
+        if (!unavailRes.ok) throw new Error("Failed to load unavailabilities");
+
+        const schedules: ApiSchedule[] = await schedRes.json();
+        const unavailabilities: ApiUnavailability[] = await unavailRes.json();
 
         const toDateISO = (sd: string) => {
           const raw = String(sd);
@@ -95,8 +111,10 @@ export default function DashboardPage() {
         const morningColor = "#ec6602";
         const eveningColor = "#009999";
         const defaultColor = "#8b5cf6";
+        const unavailColor = "#f43f5e"; // rose-500
 
-        const events = data.map((s) => {
+        // Schedule events
+        const scheduleEvents = schedules.map((s) => {
           const d = toDateISO(s.schedule_date);
           const st = toHHMMSS(s.start_time);
           const et = toHHMMSS(s.end_time);
@@ -107,7 +125,7 @@ export default function DashboardPage() {
             : defaultColor;
           const endDate = toMinutes(et) <= toMinutes(st) ? addDays(d, 1) : d;
           return {
-            id: String(s.id),
+            id: `schedule-${s.id}`,
             title: buildTitle(s, st, et),
             start: `${d}T${st}`,
             end: `${endDate}T${et}`,
@@ -117,11 +135,30 @@ export default function DashboardPage() {
           };
         });
 
-        setCalendarEvents(events);
-        if (data.length > 0) {
-          const minDate = data.map((s) => toDateISO(s.schedule_date)).sort()[0];
+        // Unavailability events
+        const unavailEvents = unavailabilities.map((u) => {
+          const startDate = toDateISO(u.start_date);
+          const endDate = toDateISO(u.end_date);
+          return {
+            id: `unavail-${u.id}`,
+            title: `Unavailable: ${u.employee_name}${u.remarks ? ` (${u.remarks})` : ""}`,
+            start: startDate,
+            end: addDays(endDate, 1), // FullCalendar exclusive end
+            backgroundColor: unavailColor,
+            borderColor: unavailColor,
+            display: "block",
+          };
+        });
+
+        const allEvents = [...scheduleEvents, ...unavailEvents];
+
+        setCalendarEvents(allEvents);
+
+        if (allEvents.length > 0) {
+          const minDate = allEvents.map((e) => e.start.slice(0, 10)).sort()[0];
           setInitialDate(minDate);
         }
+
         setEventsError(null);
       } catch (err) {
         setEventsError((err as Error).message || "Unknown error");
@@ -129,17 +166,22 @@ export default function DashboardPage() {
         setLoadingEvents(false);
       }
     }
-    loadSchedules();
+
+    loadEvents();
   }, []);
 
   return (
     <div className="p-6 space-y-6">
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <StatCard title="Total Employees" value={totalEmployees.toString()} color="from-indigo-500 to-purple-500" />
+        <Link href="/employees">
+          <StatCard title="Total Employees" value={totalEmployees.toString()} color="from-indigo-500 to-purple-500" />
+        </Link>
         <StatCard title="Shifts This Week" value={totalShiftsThisWeek.toString()} color="from-emerald-500 to-teal-500" />
         <StatCard title="Fill Rate" value={`${fillRatePct}%`} color="from-orange-500 to-amber-500" />
-        <StatCard title="Unavailabilities" value={unavailCount.toString()} color="from-rose-500 to-pink-500" />
+        <Link href="/unavailabilities">
+          <StatCard title="Unavailabilities" value={unavailCount.toString()} color="from-rose-500 to-pink-500" />
+        </Link>
       </div>
 
       {/* Calendar */}
