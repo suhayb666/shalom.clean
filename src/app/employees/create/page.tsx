@@ -8,10 +8,35 @@ export default function CreateEmployeePage() {
     name: "",
     gender: "",
     date_of_birth: "",
+    age: "",
+    designation: "",
+    email: "",
+    phone: "",
   });
 
+  function calculateAge(dob: string) {
+    if (!dob) return "";
+    const birthDate = new Date(dob);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age.toString();
+  }
+
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    if (name === "date_of_birth") {
+      setForm({
+        ...form,
+        date_of_birth: value,
+        age: calculateAge(value),
+      });
+    } else {
+      setForm({ ...form, [name]: value });
+    }
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -25,6 +50,8 @@ export default function CreateEmployeePage() {
     <div className="container mt-5 max-w-lg mx-auto">
       <h1 className="text-2xl font-bold mb-4 text-black">Add New Employee</h1>
       <form onSubmit={handleSubmit} className="space-y-4">
+        
+        {/* Name */}
         <div>
           <label className="block mb-1 font-medium text-black">Name</label>
           <input
@@ -35,6 +62,8 @@ export default function CreateEmployeePage() {
             required
           />
         </div>
+
+        {/* Gender */}
         <div>
           <label className="block mb-1 font-medium text-black">Gender</label>
           <select
@@ -50,6 +79,8 @@ export default function CreateEmployeePage() {
             <option className="text-black">Other</option>
           </select>
         </div>
+
+        {/* Date of Birth */}
         <div>
           <label className="block mb-1 font-medium text-black">Date of Birth</label>
           <input
@@ -61,6 +92,58 @@ export default function CreateEmployeePage() {
             required
           />
         </div>
+
+        {/* Age (Auto-calculated) */}
+        <div>
+          <label className="block mb-1 font-medium text-black">Age</label>
+          <input
+            type="number"
+            name="age"
+            value={form.age}
+            readOnly
+            className="w-full border px-3 py-2 rounded text-black bg-gray-100"
+          />
+        </div>
+
+        {/* Designation */}
+        <div>
+          <label className="block mb-1 font-medium text-black">Designation</label>
+          <input
+            name="designation"
+            value={form.designation}
+            onChange={handleChange}
+            className="w-full border px-3 py-2 rounded text-black placeholder-black"
+            required
+          />
+        </div>
+
+        {/* Email */}
+        <div>
+          <label className="block mb-1 font-medium text-black">Email</label>
+          <input
+            type="email"
+            name="email"
+            value={form.email}
+            onChange={handleChange}
+            className="w-full border px-3 py-2 rounded text-black placeholder-black"
+            required
+          />
+        </div>
+
+        {/* Phone */}
+        <div>
+          <label className="block mb-1 font-medium text-black">Phone</label>
+          <input
+            type="tel"
+            name="phone"
+            value={form.phone}
+            onChange={handleChange}
+            className="w-full border px-3 py-2 rounded text-black placeholder-black"
+            required
+          />
+        </div>
+
+        {/* Buttons */}
         <div className="flex gap-2">
           <button type="submit" className="btn-grad-add flex items-center justify-center">
             Add
