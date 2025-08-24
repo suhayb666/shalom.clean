@@ -1,0 +1,18 @@
+{
+  "css.validate": false,
+  "less.validate": false,
+  "scss.validate": false,
+  "css.lint.unknownAtRules": "ignore",
+  "scss.lint.unknownAtRules": "ignore",
+  "less.lint.unknownAtRules": "ignore",
+  "editor.quickSuggestions": {
+    "strings": true
+  },
+  "tailwindCSS.includeLanguages": {
+    "plaintext": "css",
+    "postcss": "css"
+  },
+  "css.customData": [
+    "./.vscode/tailwind-custom-data.json"
+  ]
+}

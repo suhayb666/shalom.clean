@@ -1,45 +1,143 @@
+/* eslint-disable */
+/* stylelint-disable */
+/* @theme is a valid Tailwind CSS v4 directive */
+
+
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  --color-*: initial;
+  --radius: 0.5rem;
+  
+  --color-background: oklch(100% 0 0);
+  --color-foreground: oklch(9% 0 0);
+  --color-sidebar: oklch(91% 0 0);
+  --color-sidebar-foreground: #e2d1c3;
+  --color-primary: oklch(10% 0 0);
+  --color-primary-foreground: oklch(98% 0 0);
+  
+  --chart-1: oklch(61% 0.222 12);
+  --chart-2: oklch(39% 0.165 173);
+  --chart-3: oklch(24% 0.088 197);
+  --chart-4: oklch(66% 0.191 43);
+  --chart-5: oklch(67% 0.216 27);
+  
+  /* Standard shadcn colors */
+  --border: oklch(91.4% 0.045 214.3);
+  --input: oklch(91.4% 0.045 214.3);
+  --ring: oklch(11.2% 0.089 222.2);
+  --card: oklch(100% 0 0);
+  --card-foreground: oklch(11.2% 0.089 222.2);
+  --popover: oklch(100% 0 0);
+  --popover-foreground: oklch(11.2% 0.089 222.2);
+  --secondary: oklch(96% 0.021 210);
+  --secondary-foreground: oklch(11.2% 0.089 222.2);
+  --muted: oklch(96% 0.021 210);
+  --muted-foreground: oklch(46.9% 0.039 215.4);
+  --accent: oklch(96% 0.021 210);
+  --accent-foreground: oklch(11.2% 0.089 222.2);
+  --destructive: oklch(60.2% 0.207 0);
+  --destructive-foreground: oklch(98% 0.013 210);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+@theme dark {
+  --color-background: oklch(4% 0.021 224);
+  --color-foreground: oklch(91% 0.026 213);
+  --color-sidebar: oklch(18% 0.019 220);
+  --color-sidebar-foreground: #e5e7eb;
+  --color-primary: oklch(98% 0 0);
+  --color-primary-foreground: oklch(10% 0.003 240);
+  
+  --chart-1: oklch(50% 0.185 220);
+  --chart-2: oklch(45% 0.138 160);
+  --chart-3: oklch(55% 0.155 30);
+  --chart-4: oklch(60% 0.128 280);
+  --chart-5: oklch(55% 0.158 340);
+  
+  /* Dark mode colors */
+  --border: oklch(17.5% 0.064 217.2);
+  --input: oklch(17.5% 0.064 217.2);
+  --ring: oklch(83.9% 0.121 212.7);
+  --card: oklch(4.9% 0.025 222.2);
+  --card-foreground: oklch(98% 0.013 210);
+  --popover: oklch(4.9% 0.025 222.2);
+  --popover-foreground: oklch(98% 0.013 210);
+  --secondary: oklch(17.5% 0.064 217.2);
+  --secondary-foreground: oklch(98% 0.013 210);
+  --muted: oklch(17.5% 0.064 217.2);
+  --muted-foreground: oklch(65.1% 0.057 215);
+  --accent: oklch(17.5% 0.064 217.2);
+  --accent-foreground: oklch(98% 0.013 210);
+  --destructive: oklch(30.6% 0.125 0);
+  --destructive-foreground: oklch(98% 0.013 210);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* Custom color mappings for your classes */
+@layer utilities {
+  .bg-sidebar {
+    background-color: var(--color-sidebar);
+  }
+  
+  .text-sidebar-foreground {
+    color: var(--color-sidebar-foreground);
+  }
+  
+  .nav-link {
+    color: var(--color-sidebar-foreground);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+  }
+  
+  .nav-link:hover {
+    background-color: rgba(255, 255, 255, 0.1);
   }
 }
+  
+  .bg-chart-1 {
+    background-color: var(--chart-1);
+  }
+  
+  .bg-chart-2 {
+    background-color: var(--chart-2);
+  }
+  
+  .bg-chart-3 {
+    background-color: var(--chart-3);
+  }
+  
+  .bg-chart-4 {
+    background-color: var(--chart-4);
+  }
+  
+  .bg-chart-5 {
+    background-color: var(--chart-5);
+  }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-}
-
-/* App-wide gradient background for pages (keeps sidebar styling separate) */
+/* Your custom gradients */
 .app-gradient {
-  background-image: linear-gradient(135deg, #fdfcfb 0%, #e2d1c3 100%);
-  background-attachment: fixed;
+  background: linear-gradient(135deg, #fdfcfb 0%, #e2d1c3 100%);
+  min-height: 100vh;
 }
 
-/* Sidebar gradient background */
 .sidebar-gradient {
-  background-image: linear-gradient(to right, #434343 0%, black 100%);
+  background: linear-gradient(to right, #434343 0%, #000000 100%);
 }
 
-/* Gradient button used for Cancel actions */
+.dark .app-gradient {
+  background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
+}
+
+.dark .sidebar-gradient {
+  background: linear-gradient(to right, #1a1a1a 0%, #000000 100%);
+}
+
+/* Your button gradients */
 .btn-grad {
-  background-image: linear-gradient(to right, #e52d27 0%, #b31217 51%, #e52d27 100%);
-  /* spacing handled by container (gap); remove outer margins */
+  background: linear-gradient(to right, #e52d27 0%, #b31217 51%, #e52d27 100%);
   padding: 12px 28px;
   text-align: center;
   text-transform: uppercase;
@@ -59,9 +157,8 @@ body {
   text-decoration: none;
 }
 
-/* Gradient button for Add actions */
 .btn-grad-add {
-  background-image: linear-gradient(to right, #005C97 0%, #363795 51%, #005C97 100%);
+  background: linear-gradient(to right, #005C97 0%, #363795 51%, #005C97 100%);
   padding: 12px 28px;
   text-align: center;
   text-transform: uppercase;
@@ -81,110 +178,112 @@ body {
   text-decoration: none;
 }
 
-/* Icon font base */
-.icon {
-  display: inline-block;
-  width: 1em;
-  height: 1em;
-  font-style: normal;
-  font-weight: normal;
-  line-height: 1;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  margin-right: 0.5em; /* Space between icon and text */
+/* FullCalendar comprehensive styling */
+/* Event text color and wrapping */
+.fc .fc-event {
+  color: #000000 !important;
+  font-size: 12px !important;
+  line-height: 1.2 !important;
 }
 
-/* Custom Icon Content (Unicode emoji or font icons) */
-.icon-show::before {
-  content: "\1F441"; /* Eye icon */
+.fc .fc-event-title {
+  color: #000000 !important;
+  white-space: normal !important;
+  word-wrap: break-word !important;
+  overflow-wrap: break-word !important;
+  overflow: visible !important;
 }
 
-.icon-edit::before {
-  content: "\270E"; /* Pencil icon */
+.fc .fc-event-time {
+  color: #000000 !important;
+  white-space: normal !important;
 }
 
-.icon-delete::before {
-  content: "\1F5D1"; /* Wastebasket icon */
+/* Day grid specific styling */
+.fc-daygrid-event {
+  white-space: normal !important;
+  word-wrap: break-word !important;
+  overflow: visible !important;
+  height: auto !important;
+  min-height: 20px !important;
+  padding: 2px 4px !important;
 }
 
-/* === Icon Button Block Styles === */
-.icon-preview {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 12px;
-  margin-bottom: 1.666em;
-  text-align: center;
-  border-radius: 12px;                    /* ⬅️ Rounded shape */
-  background-color: #f5f5f5;              /* Light gray background */
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
-  transition: all 0.2s ease-in-out;
+.fc-daygrid-event .fc-event-title {
+  white-space: normal !important;
+  word-wrap: break-word !important;
+  overflow: visible !important;
+  hyphens: auto !important;
+}
+
+/* Calendar UI elements */
+.fc .fc-daygrid-day-number {
+  color: #000 !important;
+}
+
+.fc .fc-col-header-cell-cushion {
+  color: #000 !important;
+}
+
+.fc .fc-list-event-time {
+  color: #000 !important;
+}
+
+.fc .fc-list-event-title {
+  color: #000 !important;
+}
+
+/* Today's date styling */
+.fc .fc-daygrid-day.fc-day-today .fc-daygrid-day-number {
+  color: #000 !important;
+}
+
+.fc .fc-day-other .fc-daygrid-day-top {
+  color: #000 !important;
+  opacity: 0.7;
+}
+
+/* Button styling */
+.fc .fc-button {
+  color: #000 !important;
+}
+
+.fc .fc-button-primary:not(:disabled).fc-button-active {
+  color: #fff !important;
+}
+
+/* Time grid view styling */
+.fc-timegrid-event {
+  white-space: normal !important;
+  word-wrap: break-word !important;
+  overflow: visible !important;
+}
+
+.fc-timegrid-event .fc-event-title {
+  white-space: normal !important;
+  word-wrap: break-word !important;
+  overflow: visible !important;
+}
+
+/* List view styling */
+.fc-list-event {
   cursor: pointer;
 }
 
-.icon-preview:hover {
-  background-color: #e6f2f0;              /* Hover background */
-  transform: scale(1.05);                 /* Slight hover grow */
+.fc-list-event .fc-list-event-title {
+  white-space: normal !important;
+  word-wrap: break-word !important;
 }
 
-.icon-preview__icon {
-  font-size: 28px;
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;                     /* Circular icon background */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: #ddd;                 /* Light icon background */
-  margin-bottom: 8px;
-  transition: background 0.3s;
-}
-
-.icon-preview__caption {
-  font-size: 14px;
-  color: var(--foreground);               /* Inherits dark/light mode */
-}
-
-
-/* === FullCalendar Overrides === */
-
-/* Make all FullCalendar text black */
-.fc {
-  color: black !important;
-}
-
-/* Toolbar (month/week/day titles) */
-.fc-toolbar-title {
-  color: black !important;
-}
-
-/* Day numbers in month view */
-.fc-daygrid-day-number {
-  color: black !important;
-}
-
-/* Event titles */
-.fc-event,
-.fc-event-title,
-.fc-daygrid-event {
-  color: black !important;
-}
-
-
-/* Make month-view events wrap text and expand height */
-.fc-daygrid-event-harness {
-  white-space: normal !important; /* Allow text to wrap */
-  width: 100% !important;         /* Use full cell width */
-}
-
-.fc-event {
-  white-space: normal !important; /* Wrap inside the event box */
-  line-height: 1.3 !important;    /* Better spacing for multiple lines */
-  padding: 4px !important;        /* Add some breathing room */
-}
-
-.fc-event-title {
-  white-space: normal !important; /* Ensure title itself can wrap */
-  overflow-wrap: break-word !important; /* Break long words if needed */
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .fc .fc-event {
+    font-size: 11px !important;
+    padding: 1px 2px !important;
+  }
+  
+  .fc-daygrid-event {
+    padding: 1px 2px !important;
+    min-height: 18px !important;
+  }
 }

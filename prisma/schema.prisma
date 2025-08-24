@@ -15,6 +15,9 @@ model employees {
   email         String?  @db.VarChar(255)
   phone         String?  @db.VarChar(50)
   position      String?
+  password      String?  @db.VarChar(255)  // Add this field for authentication
+  role          String?  @default("employee") // Add role for permissions (admin, manager, employee)
+  is_active     Boolean? @default(true)     // Add this to enable/disable login
 }
 
 model schedules {
