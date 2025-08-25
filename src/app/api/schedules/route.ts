@@ -1,36 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Client } from "pg";
-
-async function getCurrentUser(req: NextRequest) {
-  try {
-    const res = await fetch(`${process.env.NEXTAUTH_URL || "http://localhost:3000"}/api/auth/me`, {
-      headers: { cookie: req.headers.get("cookie") || "" },
-      cache: "no-store",
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data.user || null;
-  } catch {
-    return null;
-  }
-}
+import pool from "@/lib/db";
+import { getCurrentUserFromRequest } from "@/lib/auth-utils";
 
 export async function GET(req: NextRequest) {
-  const client = new Client({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false },
-  });
-
   try {
-    await client.connect();
-
+    console.log("🚀 Schedules API called");
+    
     const { searchParams } = new URL(req.url);
     const me = searchParams.get("me");
 
-    const user = await getCurrentUser(req);
+    console.log("🔐 Authenticating user...");
+    const user = await getCurrentUserFromRequest(req);
+    
     if (!user) {
+      console.log("❌ Authentication failed");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    console.log("👤 User authenticated:", user.name, "Role:", user.role);
 
     let query = `
       SELECT id, employee_name, store_name, shift_name, start_time, end_time, schedule_date
@@ -39,50 +26,63 @@ export async function GET(req: NextRequest) {
     const values: any[] = [];
 
     if (me === "true") {
-      query += " WHERE employee_name = $1 ORDER BY id ASC";
+      query += " WHERE employee_name = $1 ORDER BY schedule_date DESC, id ASC";
       values.push(user.name);
+      console.log("📋 Fetching schedules for user:", user.name);
     } else {
-      query += " ORDER BY id ASC";
+      query += " ORDER BY schedule_date DESC, id ASC";
+      console.log("📋 Fetching all schedules");
     }
 
-    const res = await client.query(query, values);
-    return NextResponse.json(res.rows);
-  } catch (err) {
-    const error = err as Error;
-    console.error(error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  } finally {
-    await client.end();
+    const result = await pool.query(query, values);
+    console.log("✅ Found", result.rows.length, "schedules");
+    
+    return NextResponse.json(result.rows);
+    
+  } catch (error) {
+    console.error("🚨 Schedules GET Error:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
-  const client = new Client({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false },
-  });
-
   try {
-    await client.connect();
+    console.log("🚀 Schedules POST called");
+    
+    console.log("🔐 Authenticating user...");
+    const user = await getCurrentUserFromRequest(req);
+    
+    if (!user) {
+      console.log("❌ Authentication failed");
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    console.log("👤 User authenticated:", user.name, "Role:", user.role);
+    
     const { employee_name, store_name, shift_name, start_time, end_time, schedule_date } = await req.json();
 
     if (!employee_name || !store_name || !shift_name || !start_time || !end_time || !schedule_date) {
+      console.log("❌ Missing required fields");
       return NextResponse.json(
         { error: "Missing required fields: employee_name, store_name, shift_name, start_time, end_time, schedule_date" },
         { status: 400 }
       );
     }
 
-    const res = await client.query(
+    console.log("📝 Creating schedule for:", employee_name);
+    
+    const result = await pool.query(
       "INSERT INTO schedules (employee_name, store_name, shift_name, start_time, end_time, schedule_date) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
       [employee_name, store_name, shift_name, start_time, end_time, schedule_date]
     );
-    return NextResponse.json(res.rows[0], { status: 201 });
-  } catch (err) {
-    const error = err as Error;
-    console.error("Error creating schedule:", error);
-    return NextResponse.json({ error: error.message || "Failed to create schedule" }, { status: 500 });
-  } finally {
-    await client.end();
+    
+    console.log("✅ Schedule created successfully");
+    return NextResponse.json(result.rows[0], { status: 201 });
+    
+  } catch (error) {
+    console.error("🚨 Schedules POST Error:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
