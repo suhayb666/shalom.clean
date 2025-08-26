@@ -1,65 +1,65 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Menu } from "lucide-react";
-import Link from "next/link";
-import SidebarWrapper from "./SidebarWrapper";
-import ServiceWorkerRegister from "./ServiceWorkerRegister";
+import SidebarWrapper from "@/components/SidebarWrapper";
+import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 
 export default function ClientWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isAuthPage = pathname.startsWith("/auth");
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
 
-  if (isAuthPage) {
+  // Auth pages → simple centered layout
+  if (pathname.startsWith("/auth")) {
     return (
-      <main className="flex min-h-screen items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
+        <ServiceWorkerRegister />
         {children}
-      </main>
+      </div>
     );
   }
 
+  const handleSheetClose = () => {
+    setIsSheetOpen(false);
+  };
+
   return (
-    <>
+    <div className="flex min-h-screen bg-gray-100">
       <ServiceWorkerRegister />
 
-      <div className="flex min-h-screen">
-        {/* Desktop sidebar */}
-        <div className="hidden md:flex">
-          <SidebarWrapper />
-        </div>
-
-        <div className="flex-1 flex flex-col" style={{ marginLeft: "250px" }}>
-          {/* Mobile header */}
-          <div className="md:hidden">
-            <header className="flex justify-between items-center bg-white border-b px-4 py-3 shadow-sm">
-              <span className="font-bold text-indigo-600">Shalom App</span>
-              <Sheet>
-                <SheetTrigger asChild>
-                  <button className="p-2">
-                    <Menu className="h-6 w-6 text-gray-700" />
-                  </button>
-                </SheetTrigger>
-                <SheetContent side="left" className="p-4">
-                  <div className="font-medium text-gray-700 mb-4">Menu</div>
-                  <Link href="/dashboard" className="block py-2">
-                    Dashboard
-                  </Link>
-                  <Link href="/profile" className="block py-2">
-                    Profile
-                  </Link>
-                  <Link href="/logout" className="block py-2">
-                    Logout
-                  </Link>
-                </SheetContent>
-              </Sheet>
-            </header>
-          </div>
-
-          {/* Main content (children only rendered once) */}
-          <main className="flex-1 p-4 md:p-6">{children}</main>
-        </div>
+      {/* Desktop Sidebar */}
+      <div className="hidden md:block fixed left-0 top-0 bottom-0 w-[250px] bg-[#12355B]">
+        <SidebarWrapper />
       </div>
-    </>
+
+      {/* Mobile Topbar */}
+      <div className="md:hidden fixed top-0 left-0 right-0 h-14 bg-[#12355B] text-white flex items-center px-4 z-50">
+        <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+          <SheetTrigger asChild>
+            <button aria-label="Open Menu">
+              <Menu className="h-6 w-6" />
+            </button>
+          </SheetTrigger>
+          <SheetContent 
+            side="left" 
+            className="p-0 w-[280px] max-w-[80vw] border-0 bg-white shadow-2xl"
+            
+          >
+            <SidebarWrapper 
+              isMobile={true} 
+              onNavigate={handleSheetClose} 
+            />
+          </SheetContent>
+        </Sheet>
+        <span className="ml-4 font-bold">Shalom App</span>
+      </div>
+
+      {/* Page Content */}
+      <div className="flex-1 flex flex-col md:ml-[250px]">
+        <main className="flex-1 p-6 pt-20 md:pt-6">{children}</main>
+      </div>
+    </div>
   );
 }

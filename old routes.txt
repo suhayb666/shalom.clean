@@ -1,0 +1,275 @@
+old dahsboard  route.ts
+
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { startOfWeek, endOfWeek } from "date-fns";
+
+// Utility: get logged-in user from your /api/auth/me endpoint
+async function getCurrentUser(cookies: string | null) {
+  try {
+    const res = await fetch(
+      `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/api/auth/me`,
+      {
+        headers: { cookie: cookies || "" },
+        cache: "no-store",
+      }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.user || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function GET(req: Request) {
+  try {
+    const cookies = req.headers.get("cookie");
+    const user = await getCurrentUser(cookies);
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const start = startOfWeek(new Date(), { weekStartsOn: 1 });
+    const end = endOfWeek(new Date(), { weekStartsOn: 1 });
+
+    if (user.role === "admin") {
+      // ---------------- Admin View ----------------
+      const totalEmployees = await prisma.employees.count();
+
+      const totalShiftsThisWeek = await prisma.schedules.count({
+        where: {
+          schedule_date: { gte: start, lte: end },
+        },
+      });
+
+      const unavailCount = await prisma.unavailabilities.count();
+
+      const fillRatePct =
+        totalShiftsThisWeek > 0
+          ? Math.round(
+              (totalShiftsThisWeek / (totalShiftsThisWeek + unavailCount)) * 100
+            )
+          : 0;
+
+      return NextResponse.json({
+        totalEmployees,
+        totalShiftsThisWeek,
+        fillRatePct,
+        unavailCount,
+      });
+    } else {
+      // ---------------- Employee View ----------------
+      const userShiftsThisWeek = await prisma.schedules.count({
+        where: {
+          employee_name: user.name,
+          schedule_date: { gte: start, lte: end },
+        },
+      });
+
+      const userUnavailCount = await prisma.unavailabilities.count({
+        where: { employee_name: user.name },
+      });
+
+      return NextResponse.json({
+        userShiftsThisWeek,
+        userUnavailCount,
+      });
+    }
+  } catch (error: unknown) {
+    console.error("Dashboard API Error:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
+  }
+}
+
+
+
+old shecule route.ts
+import { NextRequest, NextResponse } from "next/server";
+import { Client } from "pg";
+
+async function getCurrentUser(req: NextRequest) {
+  try {
+    const res = await fetch(`${process.env.NEXTAUTH_URL || "http://localhost:3000"}/api/auth/me`, {
+      headers: { cookie: req.headers.get("cookie") || "" },
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.user || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function GET(req: NextRequest) {
+  const client = new Client({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
+  });
+
+  try {
+    await client.connect();
+
+    const { searchParams } = new URL(req.url);
+    const me = searchParams.get("me");
+
+    const user = await getCurrentUser(req);
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    let query = `
+      SELECT id, employee_name, store_name, shift_name, start_time, end_time, schedule_date
+      FROM schedules
+    `;
+    const values: any[] = [];
+
+    if (me === "true") {
+      query += " WHERE employee_name = $1 ORDER BY id ASC";
+      values.push(user.name);
+    } else {
+      query += " ORDER BY id ASC";
+    }
+
+    const res = await client.query(query, values);
+    return NextResponse.json(res.rows);
+  } catch (err) {
+    const error = err as Error;
+    console.error(error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  } finally {
+    await client.end();
+  }
+}
+
+export async function POST(req: NextRequest) {
+  const client = new Client({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
+  });
+
+  try {
+    await client.connect();
+    const { employee_name, store_name, shift_name, start_time, end_time, schedule_date } = await req.json();
+
+    if (!employee_name || !store_name || !shift_name || !start_time || !end_time || !schedule_date) {
+      return NextResponse.json(
+        { error: "Missing required fields: employee_name, store_name, shift_name, start_time, end_time, schedule_date" },
+        { status: 400 }
+      );
+    }
+
+    const res = await client.query(
+      "INSERT INTO schedules (employee_name, store_name, shift_name, start_time, end_time, schedule_date) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
+      [employee_name, store_name, shift_name, start_time, end_time, schedule_date]
+    );
+    return NextResponse.json(res.rows[0], { status: 201 });
+  } catch (err) {
+    const error = err as Error;
+    console.error("Error creating schedule:", error);
+    return NextResponse.json({ error: error.message || "Failed to create schedule" }, { status: 500 });
+  } finally {
+    await client.end();
+  }
+}
+
+
+=============
+
+unavailibity route.ts
+
+import { NextRequest, NextResponse } from "next/server";
+import { Client } from "pg";
+
+async function getCurrentUser(req: NextRequest) {
+  try {
+    const res = await fetch(`${process.env.NEXTAUTH_URL || "http://localhost:3000"}/api/auth/me`, {
+      headers: { cookie: req.headers.get("cookie") || "" },
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.user || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function GET(req: NextRequest) {
+  const client = new Client({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
+  });
+
+  try {
+    await client.connect();
+
+    const { searchParams } = new URL(req.url);
+    const me = searchParams.get("me");
+
+    const user = await getCurrentUser(req);
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    let query = `
+      SELECT id, employee_name, start_date, end_date, remarks
+      FROM unavailabilities
+    `;
+    const values: any[] = [];
+
+    if (me === "true") {
+      query += " WHERE employee_name = $1 ORDER BY id ASC";
+      values.push(user.name);
+    } else {
+      query += " ORDER BY id ASC";
+    }
+
+    const res = await client.query(query, values);
+    return NextResponse.json(res.rows);
+  } catch (err) {
+    const error = err as Error;
+    console.error(error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  } finally {
+    await client.end();
+  }
+}
+
+export async function POST(req: NextRequest) {
+  const client = new Client({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
+  });
+
+  try {
+    await client.connect();
+    const { employee_name, start_date, end_date, remarks } = await req.json();
+
+    if (!employee_name || !start_date || !end_date) {
+      return NextResponse.json(
+        { error: "Missing required fields: employee_name, start_date, end_date" },
+        { status: 400 }
+      );
+    }
+
+    const res = await client.query(
+      "INSERT INTO unavailabilities (employee_name, start_date, end_date, remarks) VALUES ($1, $2, $3, $4) RETURNING *",
+      [employee_name, start_date, end_date, remarks]
+    );
+    return NextResponse.json(res.rows[0], { status: 201 });
+  } catch (err) {
+    const error = err as Error;
+    console.error("Error creating unavailability:", error);
+    return NextResponse.json({ error: error.message || "Failed to create unavailability" }, { status: 500 });
+  } finally {
+    await client.end();
+  }
+}
+
+
+
