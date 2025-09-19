@@ -68,7 +68,7 @@ export async function PUT(request: NextRequest) {
     const values: any[] = [name, phone, gender, date_of_birth, position, decoded.userId];
 
     // If user wants to update password
-    if (password && password.length >= 6) {
+    if (password && password.length >= 4) {
       const hashedPassword = await bcrypt.hash(password, 12);
       query += `, password = $6 WHERE id = $7 RETURNING id, name, email, role, phone, gender, date_of_birth, position`;
       values.splice(5, 0, hashedPassword); // insert password at correct index

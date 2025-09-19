@@ -30,6 +30,7 @@ export default function BulkCreateSchedulePage() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false); // New state for submission loading
 
   const [form, setForm] = useState({
     employee_name: "",
@@ -123,6 +124,7 @@ export default function BulkCreateSchedulePage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setIsSubmitting(true); // Set submitting to true
     const errors: { date: string; reason: string }[] = [];
     const successes: string[] = [];
 
@@ -153,13 +155,15 @@ export default function BulkCreateSchedulePage() {
         errors.push({ date, reason: data.error || "Failed to create schedule" });
       }
     }
+    setIsSubmitting(false); // Set submitting to false after loop
 
     if (errors.length > 0) {
       alert(
         `Completed with warnings.\nCreated: ${successes.length}.\nSkipped: ${errors.length}.\n` +
           errors.map((e) => `${e.date}: ${e.reason}`).join("\n")
       );
-    } else {
+    }
+    else {
       alert(`Successfully created ${successes.length} schedules.`);
     }
     router.push("/schedules");
@@ -288,8 +292,20 @@ export default function BulkCreateSchedulePage() {
           </div>
 
           <div className="flex gap-2">
-            <button type="submit" className="btn-grad-add">Add</button>
-            <button type="button" className="btn-grad" onClick={() => router.push("/schedules")}>Cancel</button>
+            <button type="submit" className="btn-grad-add" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <span className="flex items-center">
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Adding...
+                </span>
+              ) : (
+                "Add"
+              )}
+            </button>
+            <button type="button" className="btn-grad" onClick={() => router.push("/schedules")} disabled={isSubmitting}>Cancel</button>
           </div>
         </form>
       )}

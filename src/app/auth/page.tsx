@@ -299,10 +299,11 @@ export default function AuthPage() {
             </button>
           </div>
 
+
           {/* Back to Home */}
           <div className="mt-6 text-center">
             <Link 
-              href="/" 
+              href="/auth" 
               className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
             >
               ← Back to Home

@@ -63,12 +63,7 @@ export async function POST(request: NextRequest) {
     // Verify password
     let isValidPassword = false;
 
-if (user.role === 'admin') {
-  // temporary bypass for debugging
-  isValidPassword = (password === "admin");
-} else {
-  isValidPassword = await bcrypt.compare(password, user.password);
-}
+    isValidPassword = await bcrypt.compare(password, user.password);
 
     console.log("🔍 Password match result:", isValidPassword);
 
