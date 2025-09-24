@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 interface FormData {
   email: string;
@@ -13,6 +13,9 @@ interface FormData {
 
 export default function AuthPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get('redirect');
+  
   const [isLogin, setIsLogin] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -81,12 +84,11 @@ export default function AuthPage() {
         throw new Error(data.message || 'Authentication failed');
       }
 
-      // Handle successful authentication
-      // You might want to store the token, update global state, etc.
       console.log('Auth successful:', data);
       
-      // Redirect to welcome
-      router.push('/welcome');
+      // Redirect to the originally requested page or default to dashboard
+      const destination = redirectTo || '/dashboard';
+      router.push(destination);
       
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -102,7 +104,8 @@ export default function AuthPage() {
       console.log('Google auth clicked');
       // For now, just simulate success
       setTimeout(() => {
-        router.push('/welcome');
+        const destination = redirectTo || '/dashboard';
+        router.push(destination);
       }, 1000);
     } catch (err) {
       setError('Google authentication failed');
@@ -127,7 +130,7 @@ export default function AuthPage() {
       style={{
         background: 'linear-gradient(135deg, #10b981 0%, #14b8a6 60%, #f43f5e 100%)'
        }}
->
+    >
       <div className="w-full max-w-md mx-4">
         {/* Auth Card */}
         <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 border border-white/20">
@@ -142,6 +145,12 @@ export default function AuthPage() {
                 : 'Join us to get started'
               }
             </p>
+            {/* Show redirect destination if present */}
+            {redirectTo && (
+              <p className="text-sm text-teal-600 mt-2">
+                You'll be redirected to {redirectTo} after login
+              </p>
+            )}
           </div>
 
           {/* Error Message */}
@@ -179,17 +188,16 @@ export default function AuthPage() {
                 Email Address
               </label>
               <input
-  type="email"
-  id="email"
-  name="email"
-  value={formData.email}
-  onChange={handleInputChange}
-  className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 focus:outline-none transition-all duration-200 bg-white/80 text-black placeholder:text-gray-700"
-  placeholder="Enter your email"
-  required
-  disabled={isLoading}
-/>
-
+                type="email"
+                id="email"
+                name="email"
+                value={formData.email}
+                onChange={handleInputChange}
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 focus:outline-none transition-all duration-200 bg-white/80 text-black placeholder:text-gray-700"
+                placeholder="Enter your email"
+                required
+                disabled={isLoading}
+              />
             </div>
 
             {/* Password */}
@@ -198,17 +206,16 @@ export default function AuthPage() {
                 Password
               </label>
               <input
-  type="password"
-  id="password"
-  name="password"
-  value={formData.password}
-  onChange={handleInputChange}
-  className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 focus:outline-none transition-all duration-200 bg-white/80 text-black placeholder:text-gray-700"
-  placeholder="Enter your password"
-  required
-  disabled={isLoading}
-/>
-
+                type="password"
+                id="password"
+                name="password"
+                value={formData.password}
+                onChange={handleInputChange}
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 focus:outline-none transition-all duration-200 bg-white/80 text-black placeholder:text-gray-700"
+                placeholder="Enter your password"
+                required
+                disabled={isLoading}
+              />
             </div>
 
             {/* Confirm Password (Sign Up Only) */}
@@ -299,11 +306,10 @@ export default function AuthPage() {
             </button>
           </div>
 
-
           {/* Back to Home */}
           <div className="mt-6 text-center">
             <Link 
-              href="/auth" 
+              href="/" 
               className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
             >
               ← Back to Home
