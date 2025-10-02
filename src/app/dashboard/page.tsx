@@ -7,6 +7,9 @@ import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import listPlugin from "@fullcalendar/list";
 import Link from "next/link";
+import { ClaimShiftModal } from "../components/ClaimShiftModal";
+import { EmployeeRequestModal } from "../components/EmployeeRequestModal"; // Import the new modal
+import { ImSpinner2 } from "react-icons/im";
 
 export default function DashboardPage() {
   const [user, setUser] = useState<any>(null);
@@ -20,13 +23,14 @@ export default function DashboardPage() {
   type ApiSchedule = {
     id: number;
     employee_id: number | null; // Added employee_id
-    employee_name: string;
+    employee_name: string | null; // Made nullable for open shifts
     store_name: string;
     shift_name: string;
     start_time: string;
     end_time: string;
     schedule_date: string;
     status: string; // Added status
+    is_open_shift: boolean; // Add is_open_shift
   };
 
   type ApiUnavailability = {
@@ -37,19 +41,36 @@ export default function DashboardPage() {
     remarks?: string;
   };
 
+  type EmployeeRequest = {
+    request_id: number;
+    requester_employee_id: number;
+    request_status: string;
+    schedule_id: number;
+    schedule_date: string;
+    shift_name: string;
+    store_name: string;
+  };
+
   const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
   const [initialDate, setInitialDate] = useState<string | undefined>(undefined);
   const [loadingEvents, setLoadingEvents] = useState<boolean>(true);
   const [eventsError, setEventsError] = useState<string | null>(null);
   const [isShiftModalOpen, setIsShiftModalOpen] = useState(false); // State for modal
   const [selectedShift, setSelectedShift] = useState<ApiSchedule | null>(null); // State for selected shift
+  const [isClaimShiftModalOpen, setIsClaimShiftModalOpen] = useState(false); // State for claim shift modal
+  const [selectedOpenShift, setSelectedOpenShift] = useState<ApiSchedule | null>(null); // State for selected open shift for claiming
+  const [isEmployeeRequestModalOpen, setIsEmployeeRequestModalOpen] = useState(false); // State for employee request modal
+  const [selectedEmployeeShift, setSelectedEmployeeShift] = useState<ApiSchedule | null>(null); // State for selected employee shift
   const [allEmployees, setAllEmployees] = useState<{
     id: number;
     name: string;
   }[]>([]); // State for all employees
 
   const [hiddenCategories, setHiddenCategories] = useState<string[]>([]);
-  const calendarEventsCategories = ["morning", "evening", "unavailability", "other"];
+  const [dynamicCalendarCategories, setDynamicCalendarCategories] = useState<string[]>(
+    [] // Initialize empty, then populate based on user role
+  );
+  const [calendarInitialView, setCalendarInitialView] = useState<string>("dayGridMonth"); // Default view
 
   // Fetch logged-in user
   useEffect(() => {
@@ -59,11 +80,19 @@ export default function DashboardPage() {
         if (res.ok) {
           const data = await res.json();
           setUser(data.user);
+          // Initialize dynamicCalendarCategories based on user role
+          if (data.user.role !== "admin") {
+            setDynamicCalendarCategories(["morning", "evening", "unavailability", "other", "open_shift", "pending_request"]);
+          } else {
+            setDynamicCalendarCategories(["morning", "evening", "unavailability", "other", "open_shift"]);
+          }
         } else {
           setUser(null);
+          setDynamicCalendarCategories(["morning", "evening", "unavailability", "other", "open_shift"]); // Default for logged out users
         }
       } catch {
         setUser(null);
+        setDynamicCalendarCategories(["morning", "evening", "unavailability", "other", "open_shift"]); // Default on error
       } finally {
         setLoadingUser(false);
       }
@@ -105,16 +134,51 @@ export default function DashboardPage() {
 
         const isAdmin = user.role === "admin";
 
-        const [schedRes, unavailRes] = await Promise.all([
+        const [schedRes, unavailRes, openShiftsRes, myRequestsRes] = await Promise.all<Response[]>([
           fetch(isAdmin ? "/api/schedules" : "/api/schedules?me=true"),
           fetch(isAdmin ? "/api/unavailabilities" : "/api/unavailabilities?me=true"),
+          fetch("/api/schedules?is_open_shift=true&status=open"), // Fetch open shifts
+          isAdmin ? Promise.resolve(new Response(JSON.stringify([]))) : fetch(`/api/open-shift-requests?employee_id=${user.id}&status=pending`), // Fetch pending requests only for non-admins
         ]);
 
         if (!schedRes.ok) throw new Error("Failed to load schedules");
         if (!unavailRes.ok) throw new Error("Failed to load unavailabilities");
+        if (!openShiftsRes.ok) throw new Error("Failed to load open shifts"); // Handle error for open shifts
+        if (!myRequestsRes.ok && !isAdmin) throw new Error("Failed to load my requests"); // Handle error for my requests only if not admin
 
         const schedules: ApiSchedule[] = await schedRes.json();
         const unavailabilities: ApiUnavailability[] = await unavailRes.json();
+        const openShifts: ApiSchedule[] = await openShiftsRes.json(); // Get open shifts data
+        const myRequests: EmployeeRequest[] = isAdmin ? [] : await myRequestsRes.json(); // Get my requests data only if not admin
+
+        // Dynamically add 'open_shift' category if there are open shifts
+        if (openShifts.length > 0 && !dynamicCalendarCategories.includes("open_shift")) {
+          setDynamicCalendarCategories(prev => [...prev, "open_shift"]);
+        } else if (openShifts.length === 0 && dynamicCalendarCategories.includes("open_shift")) {
+          setDynamicCalendarCategories(prev => prev.filter(cat => cat !== "open_shift"));
+        }
+
+        // Dynamically add 'pending_request' category if there are pending requests
+        if (!isAdmin && myRequests.length > 0 && !dynamicCalendarCategories.includes("pending_request")) {
+          setDynamicCalendarCategories(prev => [...prev, "pending_request"]);
+        } else if (!isAdmin && myRequests.length === 0 && dynamicCalendarCategories.includes("pending_request")) {
+          setDynamicCalendarCategories(prev => prev.filter(cat => cat !== "pending_request"));
+        }
+
+        if (isAdmin && dynamicCalendarCategories.includes("pending_request")) {
+          setDynamicCalendarCategories(prev => prev.filter(cat => cat !== "pending_request"));
+        }
+
+        if (openShifts.length === 0 && dynamicCalendarCategories.includes("open_shift")) {
+          setDynamicCalendarCategories(prev => prev.filter(cat => cat !== "open_shift"));
+        } else if (openShifts.length > 0 && !dynamicCalendarCategories.includes("open_shift")) {
+          setDynamicCalendarCategories(prev => [...prev, "open_shift"]);
+        }
+
+        if (!dynamicCalendarCategories.includes("morning")) setDynamicCalendarCategories(prev => [...prev, "morning"]);
+        if (!dynamicCalendarCategories.includes("evening")) setDynamicCalendarCategories(prev => [...prev, "evening"]);
+        if (!dynamicCalendarCategories.includes("unavailability")) setDynamicCalendarCategories(prev => [...prev, "unavailability"]);
+        if (!dynamicCalendarCategories.includes("other")) setDynamicCalendarCategories(prev => [...prev, "other"]);
 
         const toDateISO = (sd: string) => {
           const raw = String(sd);
@@ -145,51 +209,112 @@ export default function DashboardPage() {
           hh = hh % 12 || 12;
           return `${hh}${mm ? `:${mmStr}` : ""}${suffix}`;
         };
-        const buildTitle = (s: ApiSchedule, st: string, et: string) => {
+        const buildTitle = (s: ApiSchedule, st: string, et: string, isRequest: boolean = false) => {
           const shift = (s.shift_name || "").toLowerCase();
+          let employeeName = s.employee_name || 'Unassigned';
+
+          if (s.is_open_shift) {
+            employeeName = 'OPEN SHIFT';
+          } else if (isRequest) {
+            employeeName = `REQUESTED by ${s.employee_name}`; // For requests where employee_name is the requester
+          }
+
           if (shift.startsWith("morning"))
-            return `Morning: ${toAp(st)}-${toAp(et)} | ${s.employee_name}`;
+            return `Morning: ${toAp(st)}-${toAp(et)} | ${employeeName}`;
           if (shift.startsWith("evening"))
-            return `Evening: ${toAp(st)}-${toAp(et)} | ${s.employee_name}`;
-          if (shift.startsWith("open"))
-            return `Open: ${toAp(st)}-${toAp(et)} | ${s.employee_name}`;
-          return `${s.shift_name}: ${toAp(st)}-${toAp(et)} | ${s.employee_name}`;
+            return `Evening: ${toAp(st)}-${toAp(et)} | ${employeeName}`;
+          return `${s.shift_name}: ${toAp(st)}-${toAp(et)} | ${employeeName}`;
         };
 
         const morningColor = "#ec6602";
-        const eveningColor = "#009999";
+        const eveningColor = "#009999"; // This is the teal/sky blue color
         const defaultColor = "#8b5cf6";
         const unavailColor = "#f43f5e";
+        const openShiftColor = "#22c55e"; // Green for open shifts
+        const pendingRequestColor = "#FFA500"; // Orange for pending requests
 
-        const scheduleEvents = schedules.map((s) => {
-          const d = toDateISO(s.schedule_date);
-          const st = toHHMMSS(s.start_time);
-          const et = toHHMMSS(s.end_time);
-          const color = (s.shift_name || "").toLowerCase().startsWith("morning")
-            ? morningColor
-            : (s.shift_name || "").toLowerCase().startsWith("evening")
-            ? eveningColor
-            : defaultColor;
-          const category =
-            color === morningColor
-              ? "morning"
-              : color === eveningColor
-              ? "evening"
-              : "other";
-          const endDate = toMinutes(et) <= toMinutes(st) ? addDays(d, 1) : d;
-          return {
-            id: `schedule-${s.id}`,
-            title: buildTitle(s, st, et),
-            start: `${d}T${st}`,
-            end: `${endDate}T${et}`,
-            backgroundColor: color,
-            borderColor: color,
-            display: "block",
-            category,
-          };
-        });
+        const combinedScheduleEvents = [
+          ...schedules.map((s) => {
+            const d = toDateISO(s.schedule_date);
+            const st = toHHMMSS(s.start_time);
+            const et = toHHMMSS(s.end_time);
 
-        const unavailEvents = unavailabilities.flatMap((u) => {
+            let color = defaultColor;
+            let category = "other";
+
+            if (s.is_open_shift) {
+              color = openShiftColor;
+              category = "open_shift";
+            } else if ((s.shift_name || "").toLowerCase().startsWith("morning")) {
+              color = morningColor;
+              category = "morning";
+            } else if ((s.shift_name || "").toLowerCase().startsWith("evening")) {
+              color = eveningColor;
+              category = "evening";
+            }
+
+            const endDate = toMinutes(et) <= toMinutes(st) ? addDays(d, 1) : d;
+            return {
+              id: `schedule-${s.id}`,
+              title: buildTitle(s, st, et),
+              start: `${d}T${st}`,
+              end: `${endDate}T${et}`,
+              backgroundColor: color,
+              borderColor: color,
+              display: "block",
+              category,
+              extendedProps: { // Store original shift data
+                shiftData: s,
+                is_open_shift: s.is_open_shift,
+              },
+            };
+          }),
+          ...openShifts.map((s) => {
+            const d = toDateISO(s.schedule_date);
+            const st = toHHMMSS(s.start_time);
+            const et = toHHMMSS(s.end_time);
+
+            const endDate = toMinutes(et) <= toMinutes(st) ? addDays(d, 1) : d;
+            return {
+              id: `schedule-${s.id}`,
+              title: buildTitle(s, st, et),
+              start: `${d}T${st}`,
+              end: `${endDate}T${et}`,
+              backgroundColor: openShiftColor,
+              borderColor: openShiftColor,
+              display: "block",
+              category: "open_shift",
+              extendedProps: { 
+                shiftData: s,
+                is_open_shift: true,
+              },
+            };
+          }),
+          ...myRequests.map((req) => {
+            const d = toDateISO(req.schedule_date);
+            const st = toHHMMSS("00:00:00"); // Assuming full day request for simplicity in display, adjust if needed
+            const et = toHHMMSS("23:59:59"); // Assuming full day request for simplicity in display, adjust if needed
+
+            const endDate = toMinutes(et) <= toMinutes(st) ? addDays(d, 1) : d;
+            return {
+              id: `request-${req.request_id}`,
+              title: `REQUEST: ${req.shift_name} (${req.store_name}) - PENDING`,
+              start: `${d}T${st}`,
+              end: `${endDate}T${et}`,
+              backgroundColor: pendingRequestColor,
+              borderColor: pendingRequestColor,
+              display: "block",
+              category: "pending_request",
+              extendedProps: { 
+                requestData: req,
+                is_request: true,
+                schedule_id: req.schedule_id,
+              },
+            };
+          }),
+        ];
+
+        const allEvents = [...combinedScheduleEvents, ...unavailabilities.flatMap((u) => {
           const startDate = toDateISO(u.start_date);
           const endDate = toDateISO(u.end_date);
 
@@ -213,9 +338,7 @@ export default function DashboardPage() {
           }
 
           return events;
-        });
-
-        const allEvents = [...scheduleEvents, ...unavailEvents];
+        })];
         setCalendarEvents(allEvents);
 
         if (allEvents.length > 0) {
@@ -233,17 +356,20 @@ export default function DashboardPage() {
     loadEvents();
   }, [user]);
 
-  // Fetch all employees for admin reassign dropdown
+  // Fetch all employees for admin reassign dropdown and employee swap shifts
   useEffect(() => {
-    if (user?.role === "admin") {
+    if (user) {
       async function fetchEmployees() {
         try {
+          console.log("🔍 Fetching employees...");
           const res = await fetch("/api/employees");
+          console.log("🔍 Employees API response status:", res.status);
           if (res.ok) {
             const data = await res.json();
+            console.log("🔍 Employees data received:", data);
             setAllEmployees(data);
           } else {
-            console.error("Failed to fetch employees");
+            console.error("Failed to fetch employees, status:", res.status);
           }
         } catch (err) {
           console.error("Error fetching employees:", err);
@@ -255,14 +381,14 @@ export default function DashboardPage() {
 
   const toggleCategory = (cat: string) => {
     setHiddenCategories((prev) => {
-      if (prev.length === calendarEventsCategories.length - 1 && !prev.includes(cat)) {
+      if (prev.length === dynamicCalendarCategories.length - 1 && !prev.includes(cat)) {
         return [];
       }
-      return calendarEventsCategories.filter((c) => c !== cat);
+      return dynamicCalendarCategories.filter((c) => c !== cat);
     });
   };
 
-  const Legend = () => (
+  const Legend = ({ isAdmin }: LegendProps) => (
     <div className="flex items-center gap-4 text-sm text-black flex-wrap">
       <div className="flex items-center gap-1 cursor-pointer" onClick={() => toggleCategory("morning")}>
         <span className="w-3 h-3 rounded-sm inline-block" style={{ backgroundColor: "#ec6602" }}></span>
@@ -280,6 +406,20 @@ export default function DashboardPage() {
         <span className="w-3 h-3 rounded-sm inline-block" style={{ backgroundColor: "#8b5cf6" }}></span>
         <span>Other</span>
       </div>
+      {/* Conditionally Add Open Shift to Legend */}
+      {dynamicCalendarCategories.includes("open_shift") && (
+        <div className="flex items-center gap-1 cursor-pointer" onClick={() => toggleCategory("open_shift")}>
+          <span className="w-3 h-3 rounded-sm inline-block" style={{ backgroundColor: "#22c55e" }}></span>
+          <span>Open Shift</span>
+        </div>
+      )}
+      {/* Conditionally Add Pending Request to Legend */}
+      {!isAdmin && dynamicCalendarCategories.includes("pending_request") && (
+        <div className="flex items-center gap-1 cursor-pointer" onClick={() => toggleCategory("pending_request")}>
+          <span className="w-3 h-3 rounded-sm inline-block" style={{ backgroundColor: "#FFA500" }}></span>
+          <span>Pending Request</span>
+        </div>
+      )}
     </div>
   );
 
@@ -289,16 +429,22 @@ export default function DashboardPage() {
     setLoadingEvents(true);
     try {
       const isAdmin = user.role === "admin";
-      const [schedRes, unavailRes] = await Promise.all([
+      const [schedRes, unavailRes, openShiftsRes, myRequestsRes] = await Promise.all([
         fetch(isAdmin ? "/api/schedules" : "/api/schedules?me=true"),
         fetch(isAdmin ? "/api/unavailabilities" : "/api/unavailabilities?me=true"),
+        fetch("/api/schedules?is_open_shift=true&status=open"),
+        fetch(isAdmin ? "/api/open-shift-requests" : `/api/open-shift-requests?employee_id=${user.id}&status=pending`),
       ]);
 
       if (!schedRes.ok) throw new Error("Failed to load schedules");
       if (!unavailRes.ok) throw new Error("Failed to load unavailabilities");
+      if (!openShiftsRes.ok) throw new Error("Failed to load open shifts");
+      if (!myRequestsRes.ok && !isAdmin) throw new Error("Failed to load my requests");
 
       const schedules: ApiSchedule[] = await schedRes.json();
       const unavailabilities: ApiUnavailability[] = await unavailRes.json();
+      const openShifts: ApiSchedule[] = await openShiftsRes.json();
+      const myRequests: EmployeeRequest[] = isAdmin ? [] : await myRequestsRes.json();
 
       const toDateISO = (sd: string) => {
         const raw = String(sd);
@@ -329,16 +475,20 @@ export default function DashboardPage() {
         hh = hh % 12 || 12;
         return `${hh}${mm ? `:${mmStr}` : ""}${suffix}`;
       };
-      const buildTitle = (s: ApiSchedule, st: string, et: string) => {
+      const buildTitle = (s: ApiSchedule, st: string, et: string, isRequest: boolean = false) => {
         const shift = (s.shift_name || "").toLowerCase();
-        const employeeName = s.employee_name || (s.employee_id === null && s.status === 'open' ? 'Open' : 'Unassigned');
+        let employeeName = s.employee_name || 'Unassigned';
+
+        if (s.is_open_shift) {
+          employeeName = 'OPEN SHIFT';
+        } else if (isRequest) {
+          employeeName = `REQUESTED by ${s.employee_name}`; // For requests where employee_name is the requester
+        }
 
         if (shift.startsWith("morning"))
           return `Morning: ${toAp(st)}-${toAp(et)} | ${employeeName}`;
         if (shift.startsWith("evening"))
           return `Evening: ${toAp(st)}-${toAp(et)} | ${employeeName}`;
-        if (shift.startsWith("open"))
-          return `Open: ${toAp(st)}-${toAp(et)} | ${employeeName}`;
         return `${s.shift_name}: ${toAp(st)}-${toAp(et)} | ${employeeName}`;
       };
 
@@ -346,44 +496,91 @@ export default function DashboardPage() {
       const eveningColor = "#009999";
       const defaultColor = "#8b5cf6";
       const unavailColor = "#f43f5e";
-      const openShiftColor = "#10b981"; // A distinct color for open shifts
+      const openShiftColor = "#22c55e"; // Green for open shifts
+      const pendingRequestColor = "#FFA500"; // Orange for pending requests
 
-      const scheduleEvents = schedules.map((s) => {
-        const d = toDateISO(s.schedule_date);
-        const st = toHHMMSS(s.start_time);
-        const et = toHHMMSS(s.end_time);
+      const combinedScheduleEvents = [
+        ...schedules.map((s) => {
+          const d = toDateISO(s.schedule_date);
+          const st = toHHMMSS(s.start_time);
+          const et = toHHMMSS(s.end_time);
 
-        let color = defaultColor;
-        let category = "other";
+          let color = defaultColor;
+          let category = "other";
 
-        if (s.employee_id === null && s.status === 'open') {
+          if (s.is_open_shift) {
             color = openShiftColor;
-            category = "open";
-        } else if ((s.shift_name || "").toLowerCase().startsWith("morning")) {
+            category = "open_shift";
+          } else if ((s.shift_name || "").toLowerCase().startsWith("morning")) {
             color = morningColor;
             category = "morning";
-        } else if ((s.shift_name || "").toLowerCase().startsWith("evening")) {
+          } else if ((s.shift_name || "").toLowerCase().startsWith("evening")) {
             color = eveningColor;
             category = "evening";
-        }
+          }
 
-        const endDate = toMinutes(et) <= toMinutes(st) ? addDays(d, 1) : d;
-        return {
-          id: `schedule-${s.id}`,
-          title: buildTitle(s, st, et),
-          start: `${d}T${st}`,
-          end: `${endDate}T${et}`,
-          backgroundColor: color,
-          borderColor: color,
-          display: "block",
-          category,
-          extendedProps: { // Store original shift data
-            shiftData: s,
-          },
-        };
-      });
+          const endDate = toMinutes(et) <= toMinutes(st) ? addDays(d, 1) : d;
+          return {
+            id: `schedule-${s.id}`,
+            title: buildTitle(s, st, et),
+            start: `${d}T${st}`,
+            end: `${endDate}T${et}`,
+            backgroundColor: color,
+            borderColor: color,
+            display: "block",
+            category,
+            extendedProps: { 
+              shiftData: s,
+              is_open_shift: s.is_open_shift,
+            },
+          };
+        }),
+        ...openShifts.map((s) => {
+          const d = toDateISO(s.schedule_date);
+          const st = toHHMMSS(s.start_time);
+          const et = toHHMMSS(s.end_time);
 
-      const unavailEvents = unavailabilities.flatMap((u) => {
+          const endDate = toMinutes(et) <= toMinutes(st) ? addDays(d, 1) : d;
+          return {
+            id: `schedule-${s.id}`,
+            title: buildTitle(s, st, et),
+            start: `${d}T${st}`,
+            end: `${endDate}T${et}`,
+            backgroundColor: openShiftColor,
+            borderColor: openShiftColor,
+            display: "block",
+            category: "open_shift",
+            extendedProps: { 
+              shiftData: s,
+              is_open_shift: true,
+            },
+          };
+        }),
+        ...myRequests.map((req) => {
+          const d = toDateISO(req.schedule_date);
+          const st = toHHMMSS("00:00:00"); 
+          const et = toHHMMSS("23:59:59"); 
+
+          const endDate = toMinutes(et) <= toMinutes(st) ? addDays(d, 1) : d;
+          return {
+            id: `request-${req.request_id}`,
+            title: `REQUEST: ${req.shift_name} (${req.store_name}) - PENDING`,
+            start: `${d}T${st}`,
+            end: `${endDate}T${et}`,
+            backgroundColor: pendingRequestColor,
+            borderColor: pendingRequestColor,
+            display: "block",
+            category: "pending_request",
+            extendedProps: { 
+              requestData: req,
+              is_request: true,
+              schedule_id: req.schedule_id,
+            },
+          };
+        }),
+      ];
+
+      const allEvents = [...combinedScheduleEvents, ...unavailabilities.flatMap((u) => {
         const startDate = toDateISO(u.start_date);
         const endDate = toDateISO(u.end_date);
 
@@ -407,9 +604,7 @@ export default function DashboardPage() {
         }
 
         return events;
-      });
-
-      const allEvents = [...scheduleEvents, ...unavailEvents];
+      })];
       setCalendarEvents(allEvents);
 
       if (allEvents.length > 0) {
@@ -425,12 +620,54 @@ export default function DashboardPage() {
     }
   };
 
-  const handleEventClick = (arg: any) => {
-    if (user?.role === "admin") {
-      const shiftData: ApiSchedule = arg.event.extendedProps.shiftData;
+  const handleEventClick = async (arg: any) => {
+    if (!user) return;
+
+    const event = arg.event;
+    const shiftData: ApiSchedule = event.extendedProps.shiftData;
+
+    if (user.role === "admin") {
       setSelectedShift(shiftData);
       setIsShiftModalOpen(true);
+    } else if (shiftData && shiftData.is_open_shift) {
+      setSelectedOpenShift(shiftData);
+      setIsClaimShiftModalOpen(true);
+    } else if (shiftData && Number(shiftData.employee_id) === Number(user.id) && !shiftData.is_open_shift) {
+      // This is an assigned shift for the current employee
+      setSelectedEmployeeShift(shiftData);
+      setIsEmployeeRequestModalOpen(true);
     }
+  };
+
+  const handleClaimShiftSubmit = async (shiftId: number, remarks: string) => {
+    try {
+      const res = await fetch("/api/open-shift-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          schedule_id: shiftId,
+          employee_id: user.id,
+          remarks: remarks, // Include remarks in the request
+        }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Failed to request shift");
+      }
+
+      alert("Shift request submitted successfully!");
+      refreshCalendarEvents(); // Refresh events after request
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Unknown error";
+      alert("Error submitting shift request: " + errorMessage);
+      throw err; // Re-throw to allow modal to handle error state
+    }
+  };
+
+  const handleCloseClaimShiftModal = () => {
+    setIsClaimShiftModalOpen(false);
+    setSelectedOpenShift(null);
   };
 
   const handleCloseShiftModal = () => {
@@ -438,7 +675,121 @@ export default function DashboardPage() {
     setSelectedShift(null);
   };
 
-  const handleReassign = async (shiftId: number, newEmployeeId: number) => {
+  const handleCloseEmployeeRequestModal = () => {
+    setIsEmployeeRequestModalOpen(false);
+    setSelectedEmployeeShift(null);
+  };
+
+  const handleSubmitTimeOff = async (shiftId: number, startDate: string, endDate: string, reason: string) => {
+    if (!user) return;
+    try {
+      const res = await fetch("/api/employee-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          request_type: "time_off",
+          employee_id: user.id,
+          start_date: startDate,
+          end_date: endDate,
+          remarks: reason,
+          schedule_id: shiftId,
+        }),
+      });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Failed to submit time off request");
+      }
+      alert("Time off request submitted successfully!");
+      refreshCalendarEvents();
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Unknown error";
+      alert("Error submitting time off request: " + errorMessage);
+      throw err;
+    }
+  };
+
+  const handleSubmitMissShift = async (shiftId: number, reason: string) => {
+    if (!user) return;
+    try {
+      const res = await fetch("/api/employee-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          request_type: "miss_shift",
+          employee_id: user.id,
+          remarks: reason,
+          schedule_id: shiftId,
+        }),
+      });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Failed to submit miss shift request");
+      }
+      alert("Miss shift request submitted successfully!");
+      refreshCalendarEvents();
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Unknown error";
+      alert("Error submitting miss shift request: " + errorMessage);
+      throw err;
+    }
+  };
+
+  const handleSubmitSwapShift = async (shiftId: number, swapWithEmployeeId: number, reason: string) => {
+    if (!user) return;
+
+    // First, get the shift details to check the date
+    try {
+      const shiftRes = await fetch(`/api/admin/schedules/${shiftId}`);
+      if (!shiftRes.ok) {
+        throw new Error("Failed to get shift details");
+      }
+      const shiftData = await shiftRes.json();
+      
+      // Check if the target employee has a shift on the same day
+      const resCheck = await fetch(`/api/employee-schedules?employee_id=${swapWithEmployeeId}&date=${shiftData.schedule_date}`);
+      if (!resCheck.ok) {
+        const errorData = await resCheck.json();
+        throw new Error(errorData.error || "Failed to check employee's schedule");
+      }
+      const employeeSchedule = await resCheck.json();
+
+      if (employeeSchedule && employeeSchedule.length > 0) {
+        alert("The selected employee already has a shift scheduled for this day. Cannot swap.");
+        throw new Error("Employee already has a shift.");
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Unknown error";
+      alert("Error checking employee schedule: " + errorMessage);
+      throw err;
+    }
+
+    try {
+      const res = await fetch("/api/employee-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          request_type: "shift_swap",
+          employee_id: user.id,
+          schedule_id: shiftId,
+          swap_with_employee_id: swapWithEmployeeId,
+          remarks: reason,
+        }),
+      });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Failed to submit swap shift request");
+      }
+      alert("Swap shift request submitted successfully!");
+      refreshCalendarEvents();
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Unknown error";
+      alert("Error submitting swap shift request: " + errorMessage);
+      throw err;
+    }
+  };
+
+  const handleReassign = async (shiftId: number, newEmployeeId: number | null) => {
+    setIsReassigning(true);
     try {
       const res = await fetch(`/api/admin/schedules/${shiftId}/reassign`, {
         method: "PUT",
@@ -455,11 +806,13 @@ export default function DashboardPage() {
     } catch (err) {
       alert((err as Error).message);
     } finally {
+      setIsReassigning(false);
       handleCloseShiftModal();
     }
   };
 
   const handleDelete = async (shiftId: number, deleteType: "this" | "all") => {
+    setIsDeleting(true);
     if (deleteType === "all") {
       alert("Deleting all recurring events is not yet implemented. Deleting this event only.");
     }
@@ -477,6 +830,7 @@ export default function DashboardPage() {
     } catch (err) {
       alert((err as Error).message);
     } finally {
+      setIsDeleting(false);
       handleCloseShiftModal();
     }
   };
@@ -488,6 +842,7 @@ export default function DashboardPage() {
     newScheduleDate: string,
     rescheduleType: "this" | "all"
   ) => {
+    setIsRescheduling(true);
     if (rescheduleType === "all") {
       alert("Rescheduling all recurring events is not yet implemented. Rescheduling this event only.");
     }
@@ -511,11 +866,24 @@ export default function DashboardPage() {
     } catch (err) {
       alert((err as Error).message);
     } finally {
+      setIsRescheduling(false);
       handleCloseShiftModal();
     }
   };
 
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      if (window.innerWidth < 768) {
+        setCalendarInitialView("listWeek");
+      } else {
+        setCalendarInitialView("dayGridMonth");
+      }
+    }
+  }, []);
+
   if (loadingUser) return <div className="p-6">Loading...</div>;
+
+  const isAdmin = user?.role === "admin";
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
@@ -542,7 +910,7 @@ export default function DashboardPage() {
       <div className="bg-white rounded-xl shadow p-4">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-3">
           <h3 className="font-semibold text-black">Calendar</h3>
-          <Legend />
+          <Legend isAdmin={isAdmin} />
         </div>
         <div className="min-h-[480px] sm:min-h-[640px]">
           {eventsError ? (
@@ -550,15 +918,12 @@ export default function DashboardPage() {
           ) : (
             <FullCalendar
               plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
-              initialView={typeof window !== "undefined" && window.innerWidth < 768 ? "listWeek" : "dayGridMonth"}
+              initialView={calendarInitialView}
               initialDate={initialDate}
               headerToolbar={{
                 left: "prev,next today",
                 center: "title",
-                right:
-                  typeof window !== "undefined" && window.innerWidth < 768
-                    ? "listWeek,timeGridDay"
-                    : "dayGridMonth,timeGridWeek,timeGridDay",
+                right: calendarInitialView === "listWeek" || calendarInitialView === "timeGridDay" ? "listWeek,timeGridDay" : "dayGridMonth,timeGridWeek,timeGridDay",
               }}
               height="auto"
               selectable
@@ -583,6 +948,25 @@ export default function DashboardPage() {
           onReschedule={handleReschedule}
         />
       )}
+
+      <ClaimShiftModal
+        isOpen={isClaimShiftModalOpen}
+        onClose={handleCloseClaimShiftModal}
+        shift={selectedOpenShift}
+        onSubmit={handleClaimShiftSubmit}
+      />
+
+      {user?.role !== "admin" && selectedEmployeeShift && (
+        <EmployeeRequestModal
+          isOpen={isEmployeeRequestModalOpen}
+          onClose={handleCloseEmployeeRequestModal}
+          shift={selectedEmployeeShift}
+          onSubmitTimeOff={handleSubmitTimeOff}
+          onSubmitMissShift={handleSubmitMissShift}
+          onSubmitSwapShift={handleSubmitSwapShift}
+          employees={allEmployees} // Pass all employees for the swap shift feature
+        />
+      )}
     </div>
   );
 }
@@ -593,7 +977,7 @@ interface ShiftManagementModalProps {
   onClose: () => void;
   shift: ApiSchedule;
   employees: { id: number; name: string }[];
-  onReassign: (shiftId: number, newEmployeeId: number) => Promise<void>;
+  onReassign: (shiftId: number, newEmployeeId: number | null) => Promise<void>; // Corrected type
   onDelete: (shiftId: number, deleteType: "this" | "all") => Promise<void>;
   onReschedule: (
     shiftId: number,
@@ -602,6 +986,10 @@ interface ShiftManagementModalProps {
     newScheduleDate: string,
     rescheduleType: "this" | "all"
   ) => Promise<void>;
+}
+
+interface LegendProps {
+  isAdmin: boolean;
 }
 
 function ShiftManagementModal({
@@ -619,6 +1007,9 @@ function ShiftManagementModal({
   const [newScheduleDate, setNewScheduleDate] = useState<string>(shift.schedule_date);
   const [rescheduleType, setRescheduleType] = useState<"this" | "all">("this");
   const [deleteType, setDeleteType] = useState<"this" | "all">("this");
+  const [isReassigning, setIsReassigning] = useState(false);
+  const [isRescheduling, setIsRescheduling] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (isOpen && shift) {
@@ -634,8 +1025,8 @@ function ShiftManagementModal({
   if (!isOpen || !shift) return null;
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+    <div className="fixed inset-0 bg-black flex items-center justify-center z-50" style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)' }}>
+      <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4" style={{ backgroundColor: 'white' }}>
         <h2 className="text-xl font-bold mb-4 text-black">Manage Shift: {shift.shift_name}</h2>
         <p className="mb-4 text-gray-700">Date: {new Date(shift.schedule_date).toLocaleDateString()}</p>
 
@@ -653,13 +1044,18 @@ function ShiftManagementModal({
                 {emp.name}
               </option>
             ))}
-            <option value="null">Unassign (Make Open)</option>
+            <option value="null">Unassign (Make Open Shift)</option> {/* Updated option text */}
           </select>
           <button
             onClick={() => onReassign(shift.id, newEmployeeId === "null" ? null : parseInt(newEmployeeId))}
-            className="w-full px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+            className="w-full px-4 py-2 bg-[#009a38] text-white rounded-md hover:bg-[#00882f] transition-colors"
+            disabled={isReassigning}
           >
-            Reassign
+            {isReassigning ? (
+              <ImSpinner2 className="animate-spin h-5 w-5 text-white" />
+            ) : (
+              "Reassign"
+            )}
           </button>
         </div>
 
@@ -714,9 +1110,14 @@ function ShiftManagementModal({
             onClick={() =>
               onReschedule(shift.id, newStartTime, newEndTime, newScheduleDate, rescheduleType)
             }
-            className="w-full px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 transition-colors"
+            className="w-full px-4 py-2 bg-[#009a38] text-white rounded-md hover:bg-[#00882f] transition-colors"
+            disabled={isRescheduling}
           >
-            Reschedule
+            {isRescheduling ? (
+              <ImSpinner2 className="animate-spin h-5 w-5 text-white" />
+            ) : (
+              "Reschedule"
+            )}
           </button>
         </div>
 
@@ -751,16 +1152,20 @@ function ShiftManagementModal({
           </div>
           <button
             onClick={() => onDelete(shift.id, deleteType)}
-            className="w-full px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+            className="w-full px-4 py-2 bg-[#dc3545] text-white rounded-md hover:bg-[#c82333] transition-colors"
+            disabled={isDeleting}
           >
-            Delete Shift
+            {isDeleting ? (
+              <ImSpinner2 className="animate-spin h-5 w-5 text-white" />
+            ) : (
+              "Delete Shift"
+            )}
           </button>
         </div>
-
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 transition-colors"
+            className="px-4 py-2 border border-[#dc3545] text-[#dc3545] rounded-md hover:bg-[#c82333] hover:text-white transition-colors"
           >
             Cancel
           </button>

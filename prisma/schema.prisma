@@ -15,19 +15,57 @@ model employees {
   email         String?  @db.VarChar(255)
   phone         String?  @db.VarChar(50)
   position      String?
-  password      String?  @db.VarChar(255)  // Add this field for authentication
-  role          String?  @default("employee") // Add role for permissions (admin, manager, employee)
-  is_active     Boolean? @default(true)     // Add this to enable/disable login
+  password      String?  @db.VarChar(255)
+  role          String?  @default("employee")
+  is_active     Boolean? @default(true)
+
+  assigned_shifts       schedules[]         @relation("AssignedShift")
+  requested_open_shifts schedules[]         @relation("RequestedShift")
+  made_requests         employee_requests[]
+  swap_requests         employee_requests[] @relation("SwapEmployee")
+  open_shift_requests   open_shift_requests[] // Added inverse relation
 }
 
 model schedules {
-  id            Int      @id @default(autoincrement())
-  employee_name String
-  store_name    String
-  shift_name    String
-  start_time    DateTime @db.Time(6)
-  end_time      DateTime @db.Time(6)
-  schedule_date DateTime @db.Date
+  id                       Int      @id @default(autoincrement())
+  employee_name            String? // Keep as is, nullable for open shifts
+  store_name               String
+  shift_name               String
+  start_time               DateTime @db.Time(6)
+  end_time                 DateTime @db.Time(6)
+  schedule_date            DateTime @db.Date
+  employee_id              Int? // ADDED: To keep the existing 'employee_id' column for assigned employee
+  is_open_shift            Boolean  @default(false)
+  requested_by_employee_id Int?
+  status                   String? // RENAMED from 'request_status' to 'status' to keep existing 'status' column
+
+  assigned_to_employee           employees?          @relation("AssignedShift", fields: [employee_id], references: [id])
+  requested_by_employee_relation employees?          @relation("RequestedShift", fields: [requested_by_employee_id], references: [id])
+  original_shift_requests        employee_requests[] @relation("OriginalShiftRequest")
+  requested_shift_requests       employee_requests[] @relation("RequestedShiftRequest")
+  open_shift_requests            open_shift_requests[] // Added inverse relation
+}
+
+// New model for the existing 'employee_requests' table
+model employee_requests {
+  id                    Int       @id @default(autoincrement())
+  employee_id           Int
+  request_type          String // e.g., 'time_off', 'shift_swap', 'miss_shift'
+  status                String // Status of the request itself (pending, approved, rejected)
+  request_date          DateTime  @default(now()) @db.Date
+  start_date            DateTime? @db.Date
+  end_date              DateTime? @db.Date
+  original_shift_id     Int? // ID of the shift the employee wants to miss or swap from
+  requested_shift_id    Int? // ID of the shift the employee wants to swap into
+  swap_with_employee_id Int? // ID of the employee to swap with
+  remarks               String?   @db.VarChar(500)
+  admin_notes           String?   @db.VarChar(500)
+  created_at            DateTime  @default(now())
+
+  employee        employees  @relation(fields: [employee_id], references: [id])
+  original_shift  schedules? @relation("OriginalShiftRequest", fields: [original_shift_id], references: [id])
+  requested_shift schedules? @relation("RequestedShiftRequest", fields: [requested_shift_id], references: [id])
+  swap_employee   employees? @relation("SwapEmployee", fields: [swap_with_employee_id], references: [id])
 }
 
 model shifts {
@@ -44,4 +82,17 @@ model unavailabilities {
   start_date    DateTime @db.Date
   end_date      DateTime @db.Date
   remarks       String?
+}
+
+model open_shift_requests {
+  id                    Int      @id @default(autoincrement())
+  schedule_id           Int
+  requester_employee_id Int
+  status                String   @default("pending")
+  remarks               String?
+  created_at            DateTime @default(now())
+  updated_at            DateTime @updatedAt
+
+  schedule schedules @relation(fields: [schedule_id], references: [id])
+  requester employees @relation(fields: [requester_employee_id], references: [id])
 }

@@ -7,7 +7,7 @@ import { MdEdit, MdDelete } from "react-icons/md";
 
 type Schedule = {
   id: number;
-  employee_name: string;
+  employee_name: string | null;
   store_name: string;
   shift_name: string;
   start_time: string; // HH:MM:SS format
@@ -75,7 +75,7 @@ export default function SchedulesPage() {
 
   const filtered = schedules.filter((s) => {
     const matchesSearch = (
-      s.employee_name.toLowerCase().includes(search.toLowerCase()) ||
+      s.employee_name?.toLowerCase().includes(search.toLowerCase()) ||
       s.store_name.toLowerCase().includes(search.toLowerCase()) ||
       s.shift_name.toLowerCase().includes(search.toLowerCase())
     );
@@ -162,7 +162,7 @@ export default function SchedulesPage() {
                 >
                   <td className="py-3 px-4 text-black">{index + 1}</td>
                   <td className="py-3 px-4 text-black">{formatDate(schedule.schedule_date)}</td>
-                  <td className="py-3 px-4 font-medium text-black">{schedule.employee_name}</td>
+                  <td className="py-3 px-4 font-medium text-black">{schedule.employee_name || "Open Shift"}</td>
                   <td className="py-3 px-4 text-black">{schedule.store_name}</td>
                   <td className="py-3 px-4 text-black">{schedule.shift_name}</td>
                   <td className="py-3 px-4 text-black">{schedule.start_time.substring(0, 5)}</td> {/* Display HH:MM */}
@@ -171,21 +171,21 @@ export default function SchedulesPage() {
                     <Link
                       href={`/schedules/${schedule.id}`}
                       className="px-2 py-1 rounded text-sm transition flex items-center justify-center text-[#009999] hover:opacity-80"
-                      aria-label={`View ${schedule.employee_name}'s schedule`}
+                      aria-label={`View ${schedule.employee_name || "Open Shift"}'s schedule`}
                     >
                       <FaEye size={16} />
                     </Link>
                     <Link
                       href={`/schedules/${schedule.id}/edit`}
                       className="px-2 py-1 rounded text-sm transition flex items-center justify-center text-[#ec6602] hover:opacity-80"
-                      aria-label={`Edit ${schedule.employee_name}'s schedule`}
+                      aria-label={`Edit ${schedule.employee_name || "Open Shift"}'s schedule`}
                     >
                       <MdEdit size={16} />
                     </Link>
                     <button
                       onClick={() => handleDelete(schedule.id)}
                       className="text-[#7a162d] px-2 py-1 rounded text-sm transition flex items-center justify-center hover:opacity-80"
-                      aria-label={`Delete ${schedule.employee_name}'s schedule`}
+                      aria-label={`Delete ${schedule.employee_name || "Open Shift"}'s schedule`}
                     >
                       <MdDelete size={16} />
                     </button>

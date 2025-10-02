@@ -10,6 +10,7 @@ import EventBusyIcon from "@mui/icons-material/EventBusy";
 import LoginIcon from "@mui/icons-material/Login";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import LogoutIcon from "@mui/icons-material/Logout";
+import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck'; // Icon for My Requests
 
 interface SidebarWrapperProps {
   isMobile?: boolean;
@@ -108,6 +109,16 @@ export default function SidebarWrapper({ isMobile = false, onNavigate }: Sidebar
             </ul>
           )}
 
+          {!checking && user && (
+            <ul className="list-none p-0 space-y-2 mb-6">
+              <li>
+                <Link href="/all-requests" onClick={handleLinkClick} className="flex items-center gap-3 py-3 px-4 rounded-lg hover:bg-gray-100 text-gray-800 font-medium transition-all duration-200">
+                  <PlaylistAddCheckIcon className={iconClass} /> Requests
+                </Link>
+              </li>
+            </ul>
+          )}
+
           {!checking && (
             <div className="mt-4 pt-4 border-t border-gray-200">
               <ul className="list-none p-0 space-y-2">
@@ -196,6 +207,16 @@ export default function SidebarWrapper({ isMobile = false, onNavigate }: Sidebar
               <li>
                 <Link href="/unavailabilities" className="nav-link">
                   <EventBusyIcon className={iconClass} /> Unavailabilities
+                </Link>
+              </li>
+            </ul>
+          )}
+
+          {!checking && user && (
+            <ul className="list-none p-0 space-y-2 mb-6">
+              <li>
+                <Link href="/all-requests" className="nav-link">
+                  <PlaylistAddCheckIcon className={iconClass} /> Requests
                 </Link>
               </li>
             </ul>

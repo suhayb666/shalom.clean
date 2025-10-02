@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { ImSpinner2 } from "react-icons/im";
 
 type Employee = {
   id: number;
@@ -30,7 +31,8 @@ export default function CreateSchedulePage() {
     shift_name: "",
     start_time: "",
     end_time: "",
-    schedule_date: "", // Add schedule_date to form state
+    schedule_date: "",
+    is_open_shift: false, // Add is_open_shift to form state
   });
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
@@ -41,6 +43,7 @@ export default function CreateSchedulePage() {
   const [errorShifts, setErrorShifts] = useState<string | null>(null);
   const [loadingUnavailabilities, setLoadingUnavailabilities] = useState(true);
   const [errorUnavailabilities, setErrorUnavailabilities] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const storeNames = ["Shalom Pizza", "Shalom Grill", "Shalom Pizza/Grill"];
 
@@ -114,6 +117,12 @@ export default function CreateSchedulePage() {
           newForm.start_time = "";
           newForm.end_time = "";
         }
+      } else if (name === "employee_name" && value === "OPEN_SHIFT") {
+        newForm.employee_name = value; // Set employee_name to "OPEN_SHIFT" (the value from the option)
+        newForm.is_open_shift = true;
+      } else if (name === "employee_name" && prevForm.is_open_shift === true && value !== "OPEN_SHIFT") {
+        // If an employee is selected after previously selecting open shift
+        newForm.is_open_shift = false;
       }
       return newForm;
     });
@@ -121,23 +130,27 @@ export default function CreateSchedulePage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setSubmitting(true);
 
-    // Check for employee unavailability
-    const scheduledDate = new Date(form.schedule_date);
-    const unavailableEmployee = unavailabilities.find(unavail => {
-      const unavailStartDate = new Date(unavail.start_date);
-      const unavailEndDate = new Date(unavail.end_date);
-      
-      return (
-        unavail.employee_name === form.employee_name &&
-        scheduledDate >= unavailStartDate &&
-        scheduledDate <= unavailEndDate
-      );
-    });
+    // If it's an open shift, no unavailability check is needed.
+    if (!form.is_open_shift) {
+      // Check for employee unavailability
+      const scheduledDate = new Date(form.schedule_date);
+      const unavailableEmployee = unavailabilities.find(unavail => {
+        const unavailStartDate = new Date(unavail.start_date);
+        const unavailEndDate = new Date(unavail.end_date);
+        
+        return (
+          unavail.employee_name === form.employee_name &&
+          scheduledDate >= unavailStartDate &&
+          scheduledDate <= unavailEndDate
+        );
+      });
 
-    if (unavailableEmployee) {
-      alert(`Employee ${form.employee_name} is unavailable on ${form.schedule_date} due to: ${unavailableEmployee.remarks}`);
-      return;
+      if (unavailableEmployee) {
+        alert(`Employee ${form.employee_name} is unavailable on ${form.schedule_date} due to: ${unavailableEmployee.remarks}`);
+        return;
+      }
     }
 
     try {
@@ -159,6 +172,9 @@ export default function CreateSchedulePage() {
       const error = err as Error;
       alert("Error creating schedule: " + (error.message || "Unknown error"));
     }
+    finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -177,9 +193,10 @@ export default function CreateSchedulePage() {
               value={form.employee_name}
               onChange={handleChange}
               className="w-full border px-3 py-2 rounded text-black"
-              required
+              required={!form.is_open_shift} // Make employee name required only if not an open shift
             >
               <option value="" className="text-gray-500">Select Employee</option>
+              <option value="OPEN_SHIFT" className="text-black">Open Shift</option> {/* Added Open Shift option */}
               {employees.map((employee) => (
                 <option key={employee.id} value={employee.name} className="text-black">
                   {employee.name}
@@ -264,13 +281,22 @@ export default function CreateSchedulePage() {
           />
         </div>
         <div className="flex gap-2">
-          <button type="submit" className="btn-grad-add flex items-center justify-center">
-            Add
+          <button
+            type="submit"
+            className="btn-grad-add flex items-center justify-center"
+            disabled={submitting}
+          >
+            {submitting ? (
+              <ImSpinner2 className="animate-spin h-5 w-5 text-white" />
+            ) : (
+              "Add"
+            )}
           </button>
           <button
             type="button"
             className="btn-grad flex items-center justify-center"
             onClick={() => router.push("/schedules")}
+            disabled={submitting}
           >
             Cancel
           </button>

@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
              s_req.shift_name as requested_shift_name, s_req.schedule_date as requested_shift_date,
              e_req.name as requesting_employee_name, swe.name as swap_with_employee_name, er.remarks, er.admin_notes
       FROM employee_requests er
-      LEFT JOIN schedules s_orig ON er.original_shift_id = s_orig.id
+      LEFT JOIN schedules s_orig ON er.schedule_id = s_orig.id
       LEFT JOIN schedules s_req ON er.requested_shift_id = s_req.id
       LEFT JOIN employees e_req ON er.employee_id = e_req.id
       LEFT JOIN employees swe ON er.swap_with_employee_id = swe.id

@@ -1,72 +1,79 @@
 import { NextRequest, NextResponse } from "next/server";
+import pool from "@/lib/db";
+import { getCurrentUserFromRequest } from "@/lib/auth-utils";
 import { Client } from "pg";
 import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
-export async function POST(request: NextRequest) {
-  const client = new Client({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false },
-  });
-
+export async function POST(req: NextRequest) {
   try {
-    const token = request.cookies.get('auth-token')?.value;
-    if (!token) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    const user = await getCurrentUserFromRequest(req);
+    if (!user || user.role === "admin") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET) as { userId: number, role: string };
+    const { request_type, schedule_id, start_date, end_date, remarks, swap_with_employee_id } = await req.json();
 
-    if (decoded.role !== 'employee') {
-      return NextResponse.json({ error: 'Only employees can submit requests' }, { status: 403 });
+    if (!request_type || !schedule_id) {
+      return NextResponse.json({ error: "Missing required fields: request_type, schedule_id" }, { status: 400 });
     }
 
-    const body = await request.json();
-    const { request_type, start_date, end_date, original_shift_id, requested_shift_id, swap_with_employee_id, remarks } = body;
+    let query = "";
+    let values: any[] = [];
 
-    if (!request_type) {
-      return NextResponse.json({ error: 'Request type is required' }, { status: 400 });
-    }
-
-    await client.connect();
-
-    let query = `INSERT INTO employee_requests (employee_id, request_type, status, request_date, start_date, end_date, original_shift_id, requested_shift_id, swap_with_employee_id, remarks) VALUES ($1, $2, $3, CURRENT_DATE, $4, $5, $6, $7, $8, $9) RETURNING *`;
-    let values: any[] = [decoded.userId, request_type, 'pending', start_date, end_date, original_shift_id, requested_shift_id, swap_with_employee_id, remarks];
-
-    // Basic validation based on request_type
     switch (request_type) {
-      case 'time_off':
-        if (!start_date || !end_date) {
-          return NextResponse.json({ error: 'Start date and end date are required for time off requests' }, { status: 400 });
+      case "time_off":
+        if (!start_date || !end_date || !remarks) {
+          return NextResponse.json({ error: "Missing required fields for time_off: start_date, end_date, remarks" }, { status: 400 });
         }
+        query = `
+          INSERT INTO employee_requests (employee_id, request_type, schedule_id, request_date, start_date, end_date, remarks, status)
+          VALUES ($1, $2, $3, NOW(), $4, $5, $6, 'pending')
+          RETURNING *;
+        `;
+        values = [user.id, request_type, schedule_id, start_date, end_date, remarks];
         break;
-      case 'shift_swap':
-        if (!original_shift_id) {
-          return NextResponse.json({ error: 'Original shift ID is required for shift swap requests' }, { status: 400 });
+      case "miss_shift":
+        if (!remarks) {
+          return NextResponse.json({ error: "Missing required fields for miss_shift: remarks" }, { status: 400 });
         }
-        // Could also validate requested_shift_id or swap_with_employee_id here if required for the initial request
+        query = `
+          INSERT INTO employee_requests (employee_id, request_type, schedule_id, request_date, remarks, status)
+          VALUES ($1, $2, $3, NOW(), $4, 'pending')
+          RETURNING *;
+        `;
+        values = [user.id, request_type, schedule_id, remarks];
         break;
-      case 'miss_shift':
-        if (!original_shift_id) {
-          return NextResponse.json({ error: 'Original shift ID is required for miss shift requests' }, { status: 400 });
+      case "shift_swap":
+        if (!swap_with_employee_id || !remarks) {
+          return NextResponse.json({ error: "Missing required fields for shift_swap: swap_with_employee_id, remarks" }, { status: 400 });
         }
+        // Optional: Check if the swap_with_employee_id exists and is an employee
+        const employeeCheck = await pool.query(
+          "SELECT id, name FROM employees WHERE id = $1",
+          [swap_with_employee_id]
+        );
+        if (employeeCheck.rows.length === 0) {
+          return NextResponse.json({ error: "Swap with employee not found" }, { status: 404 });
+        }
+
+        query = `
+          INSERT INTO employee_requests (employee_id, request_type, schedule_id, request_date, swap_with_employee_id, remarks, status)
+          VALUES ($1, $2, $3, NOW(), $4, $5, 'pending')
+          RETURNING *;
+        `;
+        values = [user.id, request_type, schedule_id, swap_with_employee_id, remarks];
         break;
       default:
-        return NextResponse.json({ error: 'Invalid request type' }, { status: 400 });
+        return NextResponse.json({ error: "Invalid request type" }, { status: 400 });
     }
 
-    const result = await client.query(query, values);
-
+    const result = await pool.query(query, values);
     return NextResponse.json(result.rows[0], { status: 201 });
-  } catch (error: unknown) {
-    console.error('POST /api/employee-requests Error:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to submit employee request' },
-      { status: 500 }
-    );
-  } finally {
-    await client.end().catch(() => {});
+  } catch (error) {
+    console.error("Error submitting employee request:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
 
@@ -92,7 +99,7 @@ export async function GET(request: NextRequest) {
              s_req.shift_name as requested_shift_name, s_req.schedule_date as requested_shift_date,
              swe.name as swap_with_employee_name, er.remarks, er.admin_notes
       FROM employee_requests er
-      LEFT JOIN schedules s_orig ON er.original_shift_id = s_orig.id
+      LEFT JOIN schedules s_orig ON er.schedule_id = s_orig.id
       LEFT JOIN schedules s_req ON er.requested_shift_id = s_req.id
       LEFT JOIN employees swe ON er.swap_with_employee_id = swe.id
     `;

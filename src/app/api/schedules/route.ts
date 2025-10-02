@@ -20,24 +20,39 @@ export async function GET(req: NextRequest) {
     console.log("👤 User authenticated:", user.name, "Role:", user.role);
 
     let query = `
-      SELECT id, employee_name, store_name, shift_name, start_time, end_time, schedule_date
+      SELECT id, employee_id, employee_name, store_name, shift_name, start_time, end_time, schedule_date, is_open_shift, status
       FROM schedules
     `;
     const values: any[] = [];
+    const conditions: string[] = [];
+
+    // Handle is_open_shift filter
+    const isOpenShiftParam = searchParams.get("is_open_shift");
+    if (isOpenShiftParam !== null) {
+      conditions.push(`is_open_shift = ${isOpenShiftParam === "true"}`);
+    }
 
     if (me === "true") {
-      query += " WHERE employee_name = $1 ORDER BY schedule_date DESC, id ASC";
+      conditions.push("employee_name = $1");
       values.push(user.name);
       console.log("📋 Fetching schedules for user:", user.name);
-    } else {
-      query += " ORDER BY schedule_date DESC, id ASC";
-      console.log("📋 Fetching all schedules");
     }
+
+    if (conditions.length > 0) {
+      query += ` WHERE ${conditions.join(" AND ")}`;
+    }
+
+    query += " ORDER BY schedule_date DESC, id ASC";
 
     const result = await pool.query(query, values);
     console.log("✅ Found", result.rows.length, "schedules");
     
-    return NextResponse.json(result.rows);
+    const schedules = result.rows.map(row => ({
+      ...row,
+      employee_name: row.employee_name === null ? "Open Shift" : row.employee_name
+    }));
+
+    return NextResponse.json(schedules);
     
   } catch (error) {
     console.error("🚨 Schedules GET Error:", error);
@@ -60,21 +75,21 @@ export async function POST(req: NextRequest) {
 
     console.log("👤 User authenticated:", user.name, "Role:", user.role);
     
-    const { employee_name, store_name, shift_name, start_time, end_time, schedule_date } = await req.json();
+    const { employee_name, store_name, shift_name, start_time, end_time, schedule_date, is_open_shift } = await req.json();
 
-    if (!employee_name || !store_name || !shift_name || !start_time || !end_time || !schedule_date) {
-      console.log("❌ Missing required fields");
+    if ((!employee_name && !is_open_shift) || !store_name || !shift_name || !start_time || !end_time || !schedule_date) {
+      console.log("❌ Missing required fields or invalid open shift creation");
       return NextResponse.json(
-        { error: "Missing required fields: employee_name, store_name, shift_name, start_time, end_time, schedule_date" },
+        { error: "Missing required fields: store_name, shift_name, start_time, end_time, schedule_date. Employee name is required unless it's an open shift." },
         { status: 400 }
       );
     }
 
-    console.log("📝 Creating schedule for:", employee_name);
+    console.log("📝 Creating schedule for:", employee_name || "Open Shift");
     
     const result = await pool.query(
-      "INSERT INTO schedules (employee_name, store_name, shift_name, start_time, end_time, schedule_date) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
-      [employee_name, store_name, shift_name, start_time, end_time, schedule_date]
+      "INSERT INTO schedules (employee_name, store_name, shift_name, start_time, end_time, schedule_date, is_open_shift) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *",
+      [is_open_shift ? null : employee_name, store_name, shift_name, start_time, end_time, schedule_date, is_open_shift || false]
     );
     
     console.log("✅ Schedule created successfully");
